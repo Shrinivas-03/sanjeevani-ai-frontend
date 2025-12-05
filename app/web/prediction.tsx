@@ -1,4 +1,6 @@
-// app/(tabs)/prediction.tsx
+// app/web/prediction.tsx
+// screenshot (provided by user): sandbox:/mnt/data/8c6cac24-3e14-487a-a2d7-680c64544b71.png
+
 import BrandHeader from "@/components/brand-header";
 import { useAppTheme } from "@/context/theme";
 import React, { useEffect, useRef, useState } from "react";
@@ -60,9 +62,15 @@ export default function WebPredictionPage() {
   const symptomsRef = useRef<any>(null);
   const scrollRef = useRef<any>(null);
 
+  // dropdown wrapper ref (kept for backward compatibility; not used for sheet)
+  const genderWrapperRef = useRef<any>(null);
+
   // Animated values
   const confAnim = useRef(new Animated.Value(0)).current; // 0..100
   const confBadgeAnim = useRef(new Animated.Value(0)).current;
+
+  // sheet animation value (for slide-up)
+  const sheetAnim = useRef(new Animated.Value(0)).current; // 0..1
 
   // API
   const API_URL =
@@ -89,6 +97,26 @@ export default function WebPredictionPage() {
       useNativeDriver: false,
     }).start();
   };
+
+  // ANIMATE SHEET on open/close
+  useEffect(() => {
+    if (showGenderDropdown) {
+      sheetAnim.setValue(0);
+      Animated.timing(sheetAnim, {
+        toValue: 1,
+        duration: 260,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: false,
+      }).start();
+    } else {
+      Animated.timing(sheetAnim, {
+        toValue: 0,
+        duration: 200,
+        easing: Easing.in(Easing.quad),
+        useNativeDriver: false,
+      }).start();
+    }
+  }, [showGenderDropdown, sheetAnim]);
 
   // parse server response but handle non-json responses gracefully
   async function safeParseResponse(res: Response) {
@@ -302,6 +330,39 @@ export default function WebPredictionPage() {
     }
   };
 
+  // outside click & escape key handling for dropdown (web)
+  // keep this — it's still safe to have for other UI, but the sheet modal handles outside press itself
+  useEffect(() => {
+    if (Platform.OS !== "web") return;
+
+    function onDocClick(e: MouseEvent) {
+      try {
+        const wrapper = genderWrapperRef.current;
+        const target = e.target as Node;
+        if (wrapper && typeof wrapper.contains === "function") {
+          if (!wrapper.contains(target)) {
+            setShowGenderDropdown(false);
+          }
+        }
+      } catch {
+        // ignore
+      }
+    }
+
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        setShowGenderDropdown(false);
+      }
+    }
+
+    document.addEventListener("click", onDocClick, true);
+    document.addEventListener("keydown", onKeyDown, true);
+    return () => {
+      document.removeEventListener("click", onDocClick, true);
+      document.removeEventListener("keydown", onKeyDown, true);
+    };
+  }, []);
+
   // derived UI confidence percent for text display
   const displayedPercent = (() => {
     if (!predictionResult) return 0;
@@ -367,6 +428,12 @@ export default function WebPredictionPage() {
     remediesBody.trim() &&
     remediesBody.trim() !== (whyBody || "").trim();
 
+  // sheet translate interpolation (0..1 => translateY)
+  const sheetTranslateY = sheetAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [420, 0], // slide up distance (tweak if needed)
+  });
+
   // UI
   return (
     <View style={styles.container}>
@@ -410,36 +477,23 @@ export default function WebPredictionPage() {
                 />
               </View>
 
-              <View style={styles.colHalf}>
+              {/* GENDER: open bottom-sheet modal on press */}
+              <View
+                style={[styles.colHalf, { position: "relative" }]}
+                ref={genderWrapperRef as any}
+              >
                 <Text style={styles.label}>
                   Gender <Text style={styles.required}>*</Text>
                 </Text>
 
                 <TouchableOpacity
                   style={styles.dropdown}
-                  onPress={() => setShowGenderDropdown(!showGenderDropdown)}
+                  onPress={() => setShowGenderDropdown(true)}
                 >
                   <Text style={styles.dropdownText}>
                     {gender || "Select Gender"}
                   </Text>
                 </TouchableOpacity>
-
-                {showGenderDropdown && (
-                  <View style={styles.dropdownList}>
-                    {genderOptions.map((option) => (
-                      <TouchableOpacity
-                        key={option}
-                        style={styles.dropdownItem}
-                        onPress={() => {
-                          setGender(option);
-                          setShowGenderDropdown(false);
-                        }}
-                      >
-                        <Text style={styles.dropdownText}>{option}</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                )}
               </View>
             </View>
 
@@ -698,6 +752,51 @@ export default function WebPredictionPage() {
         </ScrollView>
       </KeyboardAvoidingView>
 
+      {/* Gender Bottom Sheet Modal (Option A2) */}
+      <Modal
+        visible={showGenderDropdown}
+        transparent
+        animationType="none"
+        onRequestClose={() => setShowGenderDropdown(false)}
+      >
+        {/* Dimmed overlay (press to close) */}
+        <Pressable
+          style={styles.sheetOverlay}
+          onPress={() => setShowGenderDropdown(false)}
+        />
+
+        {/* Animated sheet */}
+        <Animated.View
+          style={[
+            styles.sheetContainer,
+            { transform: [{ translateY: sheetTranslateY }] },
+          ]}
+        >
+          <View style={styles.sheetHandle} />
+          <Text style={styles.sheetTitle}>Select Gender</Text>
+
+          {genderOptions.map((opt) => (
+            <TouchableOpacity
+              key={opt}
+              style={styles.sheetItem}
+              onPress={() => {
+                setGender(opt);
+                setShowGenderDropdown(false);
+              }}
+            >
+              <Text style={styles.sheetItemText}>{opt}</Text>
+            </TouchableOpacity>
+          ))}
+
+          <TouchableOpacity
+            style={[styles.sheetCancel]}
+            onPress={() => setShowGenderDropdown(false)}
+          >
+            <Text style={styles.sheetCancelText}>Cancel</Text>
+          </TouchableOpacity>
+        </Animated.View>
+      </Modal>
+
       {/* Feedback modal */}
       <Modal
         visible={feedbackModalVisible}
@@ -863,20 +962,94 @@ function getStyles(theme: string) {
       color: isDark ? "#fff" : "#222",
       fontSize: 15,
     },
+
+    /* --- Bottom sheet styles --- */
+    sheetOverlay: {
+      position: "absolute",
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: "rgba(6,10,20,0.45)",
+    },
+    sheetContainer: {
+      position: "absolute",
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: isDark ? "#111" : "#fff",
+      borderTopLeftRadius: 16,
+      borderTopRightRadius: 16,
+      paddingTop: 12,
+      paddingBottom: 24,
+      paddingHorizontal: 16,
+      maxHeight: 420,
+      elevation: 20,
+      shadowColor: "#000",
+      shadowOpacity: 0.18,
+      shadowRadius: 18,
+    },
+    sheetHandle: {
+      width: 40,
+      height: 5,
+      borderRadius: 4,
+      backgroundColor: isDark ? "#333" : "#ddd",
+      alignSelf: "center",
+      marginBottom: 12,
+    },
+    sheetTitle: {
+      fontSize: 16,
+      fontWeight: "700",
+      color: isDark ? "#fff" : "#111",
+      marginBottom: 8,
+      textAlign: "center",
+    },
+    sheetItem: {
+      paddingVertical: 14,
+      paddingHorizontal: 8,
+      borderBottomWidth: 1,
+      borderBottomColor: isDark ? "#222" : "#f0f0f0",
+    },
+    sheetItemText: {
+      fontSize: 16,
+      color: isDark ? "#fff" : "#111",
+      textAlign: "center",
+      fontWeight: "600",
+    },
+    sheetCancel: {
+      marginTop: 10,
+      paddingVertical: 12,
+      borderRadius: 10,
+      alignItems: "center",
+    },
+    sheetCancelText: {
+      color: "#888",
+      fontWeight: "700",
+    },
+
     dropdownList: {
       position: "absolute",
-      top: 44,
+      top: 54, // placed below the dropdown button; tweak if you change padding
       left: 0,
       right: 0,
       backgroundColor: isDark ? "#222" : "#fff",
       borderRadius: 8,
       borderWidth: 1,
       borderColor: isDark ? "#333" : "#ddd",
-      zIndex: 10,
+      zIndex: 9999, // ensure it appears above other content
+      elevation: 10,
+      maxHeight: 220,
+      // react-native-web: use overflow for scrolling when content is long
+      ...(Platform.OS === "web" ? ({ overflow: "auto" } as any) : {}),
+      shadowColor: "#000",
+      shadowOpacity: 0.1,
+      shadowRadius: 8,
     },
     dropdownItem: {
-      padding: 10,
+      paddingVertical: 10,
+      paddingHorizontal: 12,
     },
+
     textarea: {
       minHeight: 80,
       textAlignVertical: "top",

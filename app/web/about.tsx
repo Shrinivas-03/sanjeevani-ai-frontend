@@ -185,24 +185,24 @@ export default function WebAboutPage() {
           <View style={styles.teamGrid}>
             {[
               {
+                name: "Basavaraj H G",
+                role: "Data Analyst ",
+                img: require("@/assets/images/basu.png"),
+              },
+              {
+                name: "Samrudhi",
+                role: "Backend Engineer",
+                img: require("@/assets/images/sam.png"),
+              },
+              {
+                name: "Meenakshi Jajee",
+                role: "Data Analyst",
+                img: require("@/assets/images/sonu.png"),
+              },
+              {
                 name: "Shrinivas Nadager",
-                role: "AI Engineer",
-                img: require("@/assets/images/profile-avatar.png"),
-              },
-              {
-                name: "A. Sharma",
-                role: "Ayurveda Specialist",
-                img: require("@/assets/images/profile-avatar.png"),
-              },
-              {
-                name: "S. Patil",
-                role: "Fullstack Dev",
-                img: require("@/assets/images/profile-avatar.png"),
-              },
-              {
-                name: "V. Rao",
-                role: "Healthcare Consultant",
-                img: require("@/assets/images/profile-avatar.png"),
+                role: "Full-Stack AI Developer",
+                img: require("@/assets/images/shri.png"),
               },
             ].map((mem) => (
               <View key={mem.name} style={styles.teamCard}>
@@ -440,18 +440,19 @@ function getStyles(theme) {
       borderRadius: 17,
       padding: 23,
       alignItems: "center",
-      width: 200,
+      width: 240,
       borderWidth: 1,
       borderColor: isDark ? "#223d2b" : "#dfdfdf",
     },
     teamAvatar: {
-      width: 55,
-      height: 55,
-      borderRadius: 29,
-      marginBottom: 9,
-      borderWidth: 3,
+      width: 120,
+      height: 120,
+      borderRadius: 55,
+      marginBottom: 14,
+      borderWidth: 4,
       borderColor: "#2ecc40",
     },
+
     teamName: {
       fontSize: 16,
       fontWeight: "bold",

@@ -1,3 +1,4 @@
+// app/screens/HistoryScreen.tsx
 import React, { useEffect, useState, useRef } from "react";
 import {
   Text,
@@ -8,6 +9,9 @@ import {
   ScrollView,
   Pressable,
   Alert,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
 import BrandHeader from "@/components/brand-header";
 import { useAppTheme } from "@/context/theme";
@@ -20,6 +24,65 @@ import {
 } from "@/constants/api";
 import { Ionicons } from "@expo/vector-icons";
 
+/**
+ * NOTE:
+ * This file augments the existing HistoryScreen by adding:
+ * - Input bar in the conversation detail view
+ * - sendMessageToAi (POST /api/rag/ai-remedy)
+ * - Appends user + assistant messages and auto-scrolls
+ *
+ * No backend changes required.
+ */
+
+/* ------------------------
+   Local API helper (ai-remedy)
+   ------------------------ */
+const API_BASE =
+  process.env.EXPO_PUBLIC_API_BASE_URL || "http://127.0.0.1:5000";
+const AI_REMEDY_ENDPOINT = `${API_BASE}/api/rag/ai-remedy`;
+
+async function safeParseResponse(res: Response) {
+  const ct = res.headers.get("content-type") || "";
+  if (ct.includes("application/json")) {
+    return await res.json();
+  }
+  const txt = await res.text();
+  try {
+    return JSON.parse(txt);
+  } catch {
+    return { __raw_text: txt };
+  }
+}
+
+/**
+ * Send message to ai-remedy endpoint.
+ * Expects payload: { email, query, conversation_id }
+ * Returns the parsed response (defensive to various shapes).
+ */
+async function sendMessageToAi(
+  email: string,
+  query: string,
+  conversation_id?: string | null,
+) {
+  const payload = {
+    email,
+    query,
+    conversation_id: conversation_id ?? null,
+  };
+
+  const res = await fetch(AI_REMEDY_ENDPOINT, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+
+  return safeParseResponse(res);
+}
+
+/* ------------------------
+   Component
+   ------------------------ */
+
 export default function HistoryScreen() {
   const { theme } = useAppTheme();
   const { user } = useAuth();
@@ -31,18 +94,33 @@ export default function HistoryScreen() {
   const [messages, setMessages] = useState<
     { role: "user" | "assistant" | "system"; message: string }[]
   >([]);
+  const [sending, setSending] = useState(false);
+  const [inputText, setInputText] = useState("");
   const scrollViewRef = useRef<ScrollView>(null);
 
   useEffect(() => {
     fetchConvoList();
   }, [user?.email]);
 
+  useEffect(() => {
+    // auto-scroll when messages change
+    if (scrollViewRef.current && messages.length) {
+      setTimeout(() => {
+        try {
+          scrollViewRef.current?.scrollToEnd({ animated: true });
+        } catch {}
+      }, 100);
+    }
+  }, [messages]);
+
   const fetchConvoList = async () => {
     setLoading(true);
     try {
       if (user?.email) {
         const data = await listConversations(user.email);
-        setConvos(data.conversations);
+        // defensive: data may be shaped differently
+        const convs = data?.conversations ?? data?.data?.conversations ?? [];
+        setConvos(Array.isArray(convs) ? convs : []);
       }
     } catch (e) {
       Alert.alert("Error", "Could not load conversations.");
@@ -51,14 +129,6 @@ export default function HistoryScreen() {
     }
   };
 
-  useEffect(() => {
-    if (scrollViewRef.current && messages.length) {
-      setTimeout(() => {
-        scrollViewRef.current?.scrollToEnd({ animated: true });
-      }, 100);
-    }
-  }, [messages]);
-
   async function handleSelectConversation(conversation_id: string) {
     setSelectedConvo(conversation_id);
     setMessages([]);
@@ -66,7 +136,19 @@ export default function HistoryScreen() {
     try {
       if (user?.email) {
         const data = await getConversation(user.email, conversation_id);
-        setMessages(data.messages);
+        const msgs = data?.messages ?? data?.data?.messages ?? [];
+        // ensure expected shape
+        setMessages(
+          Array.isArray(msgs)
+            ? msgs.map((m: any) => ({
+                role:
+                  m.role === "assistant" || m.role === "user"
+                    ? m.role
+                    : (m.role ?? "assistant"),
+                message: m.message ?? m.text ?? "",
+              }))
+            : [],
+        );
       }
     } catch (e) {
       Alert.alert("Error", "Could not load chat conversation.");
@@ -136,6 +218,73 @@ export default function HistoryScreen() {
   function handleBack() {
     setSelectedConvo(null);
     setMessages([]);
+    setInputText("");
+  }
+
+  async function handleSendMessage() {
+    if (!inputText.trim() || !user?.email || !selectedConvo) return;
+    const textToSend = inputText.trim();
+    // append user message locally immediately
+    setMessages((prev) => [...prev, { role: "user", message: textToSend }]);
+    setInputText("");
+    setSending(true);
+
+    try {
+      const data: any = await sendMessageToAi(
+        user.email,
+        textToSend,
+        selectedConvo,
+      );
+
+      // response can be in different shapes; check common fields
+      const assistantReply =
+        data?.response ??
+        data?.data?.response ??
+        data?.choices?.[0]?.message?.content ??
+        data?.reply ??
+        data?.message ??
+        "";
+
+      // if ai returns object with 'conversation_id' we could refresh list
+      const returnedCid =
+        data?.conversation_id ?? data?.data?.conversation_id ?? null;
+      if (returnedCid) {
+        // update convos list to reflect previews
+        fetchConvoList();
+      }
+
+      // append assistant message if present
+      if (assistantReply && assistantReply !== "") {
+        setMessages((prev) => [
+          ...prev,
+          { role: "assistant", message: String(assistantReply) },
+        ]);
+      } else {
+        // fallback message
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "assistant",
+            message:
+              "Assistant did not return a reply or returned an unexpected format.",
+          },
+        ]);
+      }
+    } catch (e) {
+      console.error("sendMessage error:", e);
+      setMessages((prev) => [
+        ...prev,
+        { role: "assistant", message: "Sorry — couldn't send message." },
+      ]);
+    } finally {
+      setSending(false);
+      // scroll to end after slight delay
+      setTimeout(() => {
+        try {
+          scrollViewRef.current?.scrollToEnd({ animated: true });
+        } catch {}
+      }, 160);
+    }
   }
 
   // Theme colors
@@ -183,6 +332,7 @@ export default function HistoryScreen() {
               <Ionicons name="trash-outline" size={16} /> Delete All Chats
             </Text>
           </Pressable>
+
           {loading && (
             <ActivityIndicator
               size="large"
@@ -190,6 +340,7 @@ export default function HistoryScreen() {
               color={primary}
             />
           )}
+
           {!loading && (
             <FlatList
               data={convos}
@@ -291,9 +442,13 @@ export default function HistoryScreen() {
           )}
         </View>
       ) : (
-        // Conversation detail view
-        <View style={{ flex: 1, backgroundColor: bgLight }}>
-          {/* Top bar with gradient */}
+        // Conversation detail view (now interactive: can send messages)
+        <KeyboardAvoidingView
+          style={{ flex: 1, backgroundColor: bgLight }}
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          keyboardVerticalOffset={120}
+        >
+          {/* Top bar */}
           <View
             style={{
               flexDirection: "row",
@@ -338,6 +493,7 @@ export default function HistoryScreen() {
                 Conversation
               </Text>
             </View>
+
             <Pressable
               onPress={handleDeleteConvo}
               style={{
@@ -356,16 +512,25 @@ export default function HistoryScreen() {
               </Text>
             </Pressable>
           </View>
+
           <ScrollView
             ref={scrollViewRef}
             style={{ flex: 1, padding: 14, backgroundColor: bgLight }}
             contentContainerStyle={{
-              paddingBottom: 36,
+              paddingBottom: 16 + 84, // space for input bar
               minHeight: 460,
             }}
             showsVerticalScrollIndicator={false}
           >
-            {messages.length === 0 && (
+            {loading && (
+              <ActivityIndicator
+                size="large"
+                style={{ marginTop: 28 }}
+                color={primary}
+              />
+            )}
+
+            {!loading && messages.length === 0 && (
               <Text
                 style={{
                   color: theme === "dark" ? "#fff" : "#444",
@@ -378,6 +543,7 @@ export default function HistoryScreen() {
                 No messages in this thread.
               </Text>
             )}
+
             {messages.map((m, idx) => (
               <View
                 key={idx}
@@ -463,7 +629,69 @@ export default function HistoryScreen() {
               </View>
             ))}
           </ScrollView>
-        </View>
+
+          {/* Input bar — visible only when a conversation is selected */}
+          <View
+            style={{
+              padding: 12,
+              borderTopWidth: 1,
+              borderTopColor: theme === "dark" ? "#122" : "#e6eef4",
+              backgroundColor: theme === "dark" ? "#071815" : "#fff",
+            }}
+          >
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 8,
+              }}
+            >
+              <TextInput
+                value={inputText}
+                onChangeText={setInputText}
+                placeholder="Type a message..."
+                placeholderTextColor={theme === "dark" ? "#9aa" : "#9aa"}
+                style={{
+                  flex: 1,
+                  backgroundColor: theme === "dark" ? "#071a12" : "#f6fbf8",
+                  paddingVertical: Platform.OS === "ios" ? 12 : 8,
+                  paddingHorizontal: 12,
+                  borderRadius: 22,
+                  fontSize: 15,
+                  color: theme === "dark" ? "#fff" : "#0b3a28",
+                }}
+                multiline
+                returnKeyType="send"
+                onSubmitEditing={() => {
+                  // iOS: onSubmitEditing may behave differently; ensure non-empty
+                  if (inputText.trim()) handleSendMessage();
+                }}
+              />
+
+              <TouchableOpacity
+                onPress={handleSendMessage}
+                disabled={sending || inputText.trim().length === 0}
+                style={{
+                  marginLeft: 6,
+                  width: 48,
+                  height: 48,
+                  borderRadius: 24,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  backgroundColor:
+                    inputText.trim().length === 0 ? "#9ee6b1" : primary,
+                  opacity: inputText.trim().length === 0 ? 0.6 : 1,
+                }}
+              >
+                {sending ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Ionicons name="send" size={20} color="#fff" />
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
       )}
     </View>
   );

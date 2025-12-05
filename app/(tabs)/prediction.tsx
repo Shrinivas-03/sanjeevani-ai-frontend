@@ -18,37 +18,23 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   View,
   Alert,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-/* =============================================================
-   Single-file Prediction Screen
-   - Uses useAuth() to get logged-in user's email
-   - Reads API base URL from process.env.EXPO_PUBLIC_API_BASE_URL
-   - Calls POST /predict and receives feedback_id
-   - Shows compact result + accordion explanation
-   - Shows Modal for feedback and calls POST /feedback/update
-   - All components included inline (no external files)
-   - Animated confidence visuals + smooth UX
-   ============================================================= */
-
-/* -------------------------
-   Small reusable helpers
-   ------------------------- */
+/* UTIL */
 const clamp = (v: number, a = 0, b = 100) => Math.max(a, Math.min(b, v));
 
-/* -------------------------
-   Animated Confidence Bar
-   ------------------------- */
+/* CONFIDENCE BAR */
 const ConfidenceBar = ({ percent, theme }: { percent: number; theme: any }) => {
   const anim = useRef(new Animated.Value(0)).current;
   const isDark = theme === "dark";
 
   useEffect(() => {
     Animated.timing(anim, {
-      toValue: clamp(percent, 0, 100),
+      toValue: clamp(percent),
       duration: 900,
       easing: Easing.out(Easing.cubic),
       useNativeDriver: false,
@@ -68,8 +54,8 @@ const ConfidenceBar = ({ percent, theme }: { percent: number; theme: any }) => {
       style={{
         height: 12,
         borderRadius: 12,
-        backgroundColor: isDark ? "#222" : "#e6f0ff",
         overflow: "hidden",
+        backgroundColor: isDark ? "#222" : "#e6f0ff",
       }}
     >
       <Animated.View
@@ -79,9 +65,7 @@ const ConfidenceBar = ({ percent, theme }: { percent: number; theme: any }) => {
   );
 };
 
-/* -------------------------
-   Circular Confidence Badge
-   ------------------------- */
+/* CONFIDENCE BADGE */
 const ConfidenceBadge = ({
   percent,
   theme,
@@ -95,7 +79,7 @@ const ConfidenceBadge = ({
 
   useEffect(() => {
     Animated.timing(anim, {
-      toValue: clamp(percent, 0, 100),
+      toValue: clamp(percent),
       duration: 900,
       easing: Easing.out(Easing.cubic),
       useNativeDriver: false,
@@ -113,33 +97,28 @@ const ConfidenceBadge = ({
         borderRadius: 40,
         backgroundColor: isDark ? "#0b0b0b" : "#fff",
         borderWidth: 1,
-        borderColor: isDark ? "#333" : "#e6eefc",
-        alignItems: "center",
+        borderColor: isDark ? "#444" : "#e6eefc",
         justifyContent: "center",
-        shadowColor: "#000",
-        shadowOpacity: 0.08,
-        shadowRadius: 8,
+        alignItems: "center",
       }}
     >
       <Text
         style={{
-          fontSize: 18,
           fontWeight: "900",
+          fontSize: 18,
           color: isDark ? "#fff" : "#111",
         }}
       >
         {display}%
       </Text>
-      <Text style={{ fontSize: 10, color: isDark ? "#9aa" : "#666" }}>
+      <Text style={{ fontSize: 10, color: isDark ? "#aaa" : "#555" }}>
         confidence
       </Text>
     </View>
   );
 };
 
-/* -------------------------
-   Accordion (scroll-friendly)
-   ------------------------- */
+/* ACCORDION */
 const Accordion = ({ title, children, theme }: any) => {
   const [open, setOpen] = useState(false);
   const anim = useRef(new Animated.Value(0)).current;
@@ -148,7 +127,7 @@ const Accordion = ({ title, children, theme }: any) => {
   const toggle = () => {
     Animated.timing(anim, {
       toValue: open ? 0 : 1,
-      duration: 260,
+      duration: 250,
       easing: Easing.out(Easing.quad),
       useNativeDriver: true,
     }).start();
@@ -156,30 +135,24 @@ const Accordion = ({ title, children, theme }: any) => {
   };
 
   return (
-    <View style={{ marginTop: 14 }}>
+    <View style={{ marginTop: 16 }}>
       <TouchableOpacity
-        activeOpacity={0.9}
         onPress={toggle}
+        activeOpacity={0.9}
         style={{
-          backgroundColor: isDark ? "#111" : "#f0f8ff",
+          backgroundColor: isDark ? "#111" : "#eef6ff",
           padding: 12,
-          borderRadius: 10,
+          borderRadius: 12,
           borderWidth: 1,
           borderColor: isDark ? "#333" : "#cfe6ff",
         }}
       >
-        <View
-          style={{
-            flexDirection: "row",
-            justifyContent: "space-between",
-            alignItems: "center",
-          }}
-        >
+        <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
           <Text
             style={{
               fontWeight: "700",
-              color: isDark ? "#fff" : "#0b3d91",
               fontSize: 15,
+              color: isDark ? "#fff" : "#0b3d91",
             }}
           >
             {title}
@@ -193,25 +166,25 @@ const Accordion = ({ title, children, theme }: any) => {
       {open && (
         <Animated.View
           style={{
+            opacity: anim,
             transform: [
               {
                 translateY: anim.interpolate({
                   inputRange: [0, 1],
-                  outputRange: [-8, 0],
+                  outputRange: [-12, 0],
                 }),
               },
             ],
-            opacity: anim,
           }}
         >
           <View
             style={{
-              marginTop: 10,
-              padding: 12,
               backgroundColor: isDark ? "#181a1b" : "#fff",
+              padding: 12,
+              marginTop: 10,
               borderRadius: 10,
               borderWidth: 1,
-              borderColor: isDark ? "#333" : "#e6eefc",
+              borderColor: isDark ? "#333" : "#dce7f7",
             }}
           >
             {children}
@@ -222,85 +195,50 @@ const Accordion = ({ title, children, theme }: any) => {
   );
 };
 
-/* -------------------------
-   PrettyExplanation -> format LLM text
-   ------------------------- */
-const PrettyExplanation = ({ text, theme }: { text: string; theme: any }) => {
+/* PRETTY EXPLANATION */
+const PrettyExplanation = ({ text, theme }: any) => {
   const isDark = theme === "dark";
+
   if (!text) {
     return (
-      <Text style={{ color: isDark ? "#aaa" : "#666" }}>
-        No explanation available.
+      <Text style={{ color: isDark ? "#aaa" : "#555" }}>
+        No explanation provided.
       </Text>
     );
   }
 
-  const raw = text.replace(/\r/g, "");
-  const parts = raw
-    .split(/\n{2,}/)
-    .map((p) => p.trim())
-    .filter(Boolean);
+  const parts = text.replace(/\r/g, "").split(/\n{2,}/);
 
   return (
     <View>
-      {parts.map((p, idx) => {
-        if (/^(\*|-|\d+\.)/m.test(p)) {
-          const lines = p
-            .split(/\n/)
-            .map((l) => l.replace(/^[\*\-\d\.\)\s]+/, "").trim());
-          return (
-            <View key={idx} style={{ marginBottom: 8 }}>
-              {lines.map((l, i) => (
-                <View key={i} style={{ flexDirection: "row", marginBottom: 6 }}>
-                  <Text
-                    style={{ width: 8, color: isDark ? "#9aa" : "#3b4b6b" }}
-                  >
-                    •
-                  </Text>
-                  <Text
-                    style={{
-                      flex: 1,
-                      color: isDark ? "#ccc" : "#333",
-                      lineHeight: 20,
-                    }}
-                  >
-                    {l}
-                  </Text>
-                </View>
-              ))}
-            </View>
-          );
-        }
-        return (
-          <Text
-            key={idx}
-            style={{
-              marginBottom: 10,
-              color: isDark ? "#ccc" : "#333",
-              lineHeight: 20,
-            }}
-          >
-            {p}
-          </Text>
-        );
-      })}
+      {parts.map((p: string, idx: number) => (
+        <Text
+          key={idx}
+          style={{
+            color: isDark ? "#ddd" : "#333",
+            lineHeight: 20,
+            marginBottom: 10,
+          }}
+        >
+          {p}
+        </Text>
+      ))}
     </View>
   );
 };
 
-/* -------------------------
-   Small inputs (inline)
-   ------------------------- */
+/* INPUT FIELD */
 function InputField({
   label,
   value,
   setValue,
-  numeric = false,
-  required = false,
-  containerStyle = {},
+  numeric,
+  required,
+  containerStyle,
   theme,
 }: any) {
   const isDark = theme === "dark";
+
   return (
     <View style={[{ flex: 1 }, containerStyle]}>
       <Text style={[stylesGlobal.label, isDark && { color: "#eee" }]}>
@@ -310,56 +248,68 @@ function InputField({
         value={value}
         onChangeText={setValue}
         keyboardType={numeric ? "numeric" : "default"}
+        returnKeyType="done"
+        blurOnSubmit={true}
         style={[
           stylesGlobal.input,
-          isDark && { backgroundColor: "#181a1b", color: "#fff" },
+          isDark && {
+            backgroundColor: "#181a1b",
+            borderColor: "#333",
+            color: "#fff",
+          },
         ]}
       />
     </View>
   );
 }
 
+/* TEXTAREA */
 function SectionTextarea({
   label,
   value,
   setValue,
   placeholder,
-  required = false,
+  required,
   theme,
 }: any) {
   const isDark = theme === "dark";
+
   return (
-    <View style={{ marginBottom: 12 }}>
+    <View style={{ marginBottom: 14 }}>
       <Text style={[stylesGlobal.label, isDark && { color: "#eee" }]}>
         {label} {required && <Text style={stylesGlobal.required}>*</Text>}
       </Text>
       <TextInput
+        multiline
+        numberOfLines={3}
         value={value}
         onChangeText={setValue}
-        multiline
-        numberOfLines={4}
         placeholder={placeholder}
         placeholderTextColor={isDark ? "#777" : "#666"}
+        returnKeyType="done"
+        blurOnSubmit={true}
         style={[
           stylesGlobal.textarea,
-          isDark && { backgroundColor: "#181a1b", color: "#fff" },
+          isDark && {
+            backgroundColor: "#181a1b",
+            borderColor: "#333",
+            color: "#fff",
+          },
         ]}
       />
     </View>
   );
 }
 
-/* ============================================================
-   MAIN SCREEN COMPONENT
-   ============================================================ */
+/* MAIN SCREEN */
 export default function PredictionScreen() {
-  const { isAuthenticated, loading, user } = useAuth(); // user should contain email
+  const { isAuthenticated, loading, user } = useAuth();
   const router = useRouter();
   const { theme } = useAppTheme();
   const styles = getStyles(theme);
   const insets = useSafeAreaInsets();
 
-  // form states
+  // Form states
   const [name, setName] = useState("");
   const [age, setAge] = useState("");
   const [gender, setGender] = useState("");
@@ -373,49 +323,65 @@ export default function PredictionScreen() {
   const [medicalHistory, setMedicalHistory] = useState("");
   const [symptoms, setSymptoms] = useState("");
 
+  // Prediction + UI
   const [predictionResult, setPredictionResult] = useState<any>(null);
   const [loadingPredict, setLoadingPredict] = useState(false);
   const [showGenderDropdown, setShowGenderDropdown] = useState(false);
+
+  // Feedback
   const [feedbackModalVisible, setFeedbackModalVisible] = useState(false);
-  const [feedbackChoice, setFeedbackChoice] = useState<null | boolean>(null);
-  const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
-  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const [feedbackChoice, setFeedbackChoice] = useState<boolean | null>(null);
 
-  const genderOptions = ["Male", "Female", "Other"];
-
-  // redirect if not logged in
+  // Redirect if not logged in
   useEffect(() => {
     if (!loading && !isAuthenticated) router.replace("/signin");
-  }, [isAuthenticated, loading]);
+  }, [loading, isAuthenticated]);
 
-  // keyboard handlers (for bottom offset)
+  // Dismiss keyboard when screen unmounts
   useEffect(() => {
-    const show = Keyboard.addListener("keyboardWillShow", (e) =>
-      setKeyboardHeight(e.endCoordinates.height),
-    );
-    const hide = Keyboard.addListener("keyboardWillHide", () =>
-      setKeyboardHeight(0),
-    );
     return () => {
-      show.remove();
-      hide.remove();
+      Keyboard.dismiss();
     };
   }, []);
 
-  const bottomOffset = Math.max(0, keyboardHeight - insets.bottom);
-
-  // API urls
   const API_URL = process.env.EXPO_PUBLIC_API_BASE_URL;
-  const FEEDBACK_ENDPOINT = `${API_URL}/predict/feedback`;
-  // Option A endpoint (change if backend uses different path)
 
+  /* VALIDATION AND PREDICTION */
   const handlePredict = async () => {
-    if (!age || !gender || !symptoms) {
-      Alert.alert(
-        "Missing required fields",
-        "Please provide age, gender and symptoms.",
+    Keyboard.dismiss();
+
+    if (!name || !age || !gender || !symptoms) {
+      return Alert.alert(
+        "Missing Required Fields",
+        "Please fill in your Name, Age, Gender, and Symptoms.",
       );
-      return;
+    }
+
+    const fieldsToValidate: {
+      [key: string]: { value: string; min: number; max: number };
+    } = {
+      Age: { value: age, min: 1, max: 120 },
+      Height: { value: height, min: 20, max: 280 },
+      Weight: { value: weight, min: 1, max: 150 },
+      "Pulse Rate": { value: pulseRate, min: 30, max: 150 },
+      "BP Systolic": { value: bpSystolic, min: 50, max: 280 },
+      "BP Diastolic": { value: bpDiastolic, min: 30, max: 240 },
+      FBS: { value: fbs, min: 30, max: 600 },
+      PPBS: { value: ppbs, min: 30, max: 600 },
+    };
+
+    for (const fieldName in fieldsToValidate) {
+      const { value, min, max } = fieldsToValidate[fieldName];
+      if (value) {
+        const numValue = parseFloat(value);
+        if (isNaN(numValue) || numValue < min || numValue > max) {
+          Alert.alert(
+            "Invalid Input",
+            `${fieldName} must be a valid number between ${min} and ${max}.`,
+          );
+          return;
+        }
+      }
     }
 
     try {
@@ -423,19 +389,19 @@ export default function PredictionScreen() {
       setPredictionResult(null);
 
       const payload = {
+        name,
         age: Number(age),
         gender,
-        height: Number(height) || 0,
-        weight: Number(weight) || 0,
-        BP_systolic: Number(bpSystolic) || 0,
-        BP_diastolic: Number(bpDiastolic) || 0,
-        FBS: Number(fbs) || 0,
-        PPBS: Number(ppbs) || 0,
-        pulse_rate: Number(pulseRate) || 0,
+        height: height ? Number(height) : undefined,
+        weight: weight ? Number(weight) : undefined,
+        BP_systolic: bpSystolic ? Number(bpSystolic) : undefined,
+        BP_diastolic: bpDiastolic ? Number(bpDiastolic) : undefined,
+        FBS: fbs ? Number(fbs) : undefined,
+        PPBS: ppbs ? Number(ppbs) : undefined,
+        pulse_rate: pulseRate ? Number(pulseRate) : undefined,
         medical_history: medicalHistory,
         symptoms,
         email: user?.email ?? "unknown@local",
-        conversation_id: null,
       };
 
       const res = await fetch(`${API_URL}/predict`, {
@@ -445,248 +411,231 @@ export default function PredictionScreen() {
       });
 
       const data = await res.json();
+
       if (!res.ok) {
-        console.error("Predict error:", data);
-        Alert.alert("Prediction failed", data?.error || "Unknown server error");
-        return;
+        return Alert.alert("Prediction Failed", data?.error || "Server error");
       }
 
       setPredictionResult(data);
     } catch (err) {
-      console.error("Prediction network error:", err);
-      Alert.alert(
-        "Prediction failed",
-        "Network or server error. Check console.",
-      );
+      Alert.alert("Network Error", "Could not connect to server.");
     } finally {
       setLoadingPredict(false);
     }
   };
 
-  // parse confidence into percent (handles 0..1 and 0..100)
-  const confidencePercent = (() => {
-    if (!predictionResult || predictionResult.Confidence == null) return 0;
-    const c = Number(predictionResult.Confidence);
-    return c <= 1 ? Math.round(c * 100) : Math.round(c);
-  })();
-
-  // open feedback modal and set desired choice
-  const openFeedbackModal = (isCorrect: boolean) => {
-    setFeedbackChoice(isCorrect);
-    setFeedbackModalVisible(true);
-  };
-
-  // submit feedback to backend
+  /* SUBMIT FEEDBACK */
   const submitFeedback = async () => {
-    if (!predictionResult || !predictionResult.feedback_id) {
-      Alert.alert("Cannot send feedback", "Missing feedback id.");
-      setFeedbackModalVisible(false);
-      return;
-    }
-
     try {
-      setFeedbackSubmitting(true);
-      const body = {
-        feedback_id: predictionResult.feedback_id,
-        is_correct: feedbackChoice === true,
-      };
-
-      const res = await fetch(FEEDBACK_ENDPOINT, {
+      await fetch(`${API_URL}/predict/feedback`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
+        body: JSON.stringify({
+          feedback_id: predictionResult?.feedback_id,
+          is_correct: feedbackChoice,
+        }),
       });
 
-      const data = await res.json();
-      if (!res.ok) {
-        console.error("Feedback error:", data);
-        Alert.alert("Feedback failed", data?.error || "Server error");
-      } else {
-        Alert.alert("Thanks!", "Your feedback was recorded.");
-        // Optionally update UI locally
-        setPredictionResult((prev: any) => ({
-          ...prev,
-          is_correct: body.is_correct,
-        }));
-      }
-    } catch (err) {
-      console.error("Feedback network error:", err);
-      Alert.alert("Feedback failed", "Network or server error");
-    } finally {
-      setFeedbackSubmitting(false);
       setFeedbackModalVisible(false);
-      setFeedbackChoice(null);
+      Alert.alert("Thank you!", "Your feedback helps improve the model.");
+    } catch {
+      Alert.alert("Error", "Could not submit feedback.");
     }
   };
 
+  const confidencePercent = predictionResult?.Confidence
+    ? Math.round(
+        Number(predictionResult.Confidence) <= 1
+          ? Number(predictionResult.Confidence) * 100
+          : Number(predictionResult.Confidence),
+      )
+    : 0;
+
+  /* RENDER */
   return (
-    <View style={styles.container}>
-      <BrandHeader subtitle="Get personalized predictions" />
+    <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+      <View style={styles.container}>
+        <BrandHeader subtitle="Get personalized predictions" />
 
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-      >
-        <ScrollView
-          contentContainerStyle={[
-            styles.scrollContent,
-            { paddingBottom: bottomOffset + 20 },
-          ]}
-          keyboardShouldPersistTaps="handled"
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
         >
-          <View style={styles.card}>
-            <Text style={styles.sectionTitle}>Required Information</Text>
+          <ScrollView
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{
+              paddingHorizontal: 16,
+              paddingTop: 16,
+              paddingBottom: predictionResult ? 16 : 140,
+            }}
+          >
+            <View style={styles.card}>
+              <Text style={styles.sectionTitle}>Required Information</Text>
 
-            <InputField
-              label="Name"
-              required
-              value={name}
-              setValue={setName}
-              theme={theme}
-            />
-
-            <View style={styles.row}>
               <InputField
-                label="Age"
+                label="Name"
                 required
-                numeric
-                value={age}
-                setValue={setAge}
-                containerStyle={styles.colHalf}
+                value={name}
+                setValue={setName}
                 theme={theme}
               />
 
-              <View style={styles.colHalf}>
-                <Text style={stylesGlobal.label}>
-                  Gender <Text style={stylesGlobal.required}>*</Text>
-                </Text>
+              <View style={styles.row}>
+                <InputField
+                  label="Age"
+                  required
+                  numeric
+                  value={age}
+                  setValue={setAge}
+                  containerStyle={styles.colHalf}
+                  theme={theme}
+                />
 
-                <TouchableOpacity
-                  style={styles.dropdown}
-                  onPress={() => setShowGenderDropdown(!showGenderDropdown)}
-                  activeOpacity={0.9}
+                <View
+                  style={[styles.colHalf, { position: "relative", zIndex: 40 }]}
                 >
-                  <Text style={styles.dropdownText}>
-                    {gender || "Select Gender"}
+                  <Text
+                    style={[
+                      stylesGlobal.label,
+                      theme === "dark" && { color: "#eee" },
+                    ]}
+                  >
+                    Gender <Text style={stylesGlobal.required}>*</Text>
                   </Text>
-                </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.dropdown}
+                    onPress={() => {
+                      Keyboard.dismiss();
+                      setShowGenderDropdown(!showGenderDropdown);
+                    }}
+                  >
+                    <Text style={styles.dropdownText}>
+                      {gender || "Select Gender"}
+                    </Text>
+                  </TouchableOpacity>
 
-                {showGenderDropdown && (
-                  <View style={styles.dropdownList}>
-                    {genderOptions.map((g) => (
-                      <TouchableOpacity
-                        key={g}
-                        style={styles.dropdownItem}
-                        onPress={() => {
-                          setGender(g);
-                          setShowGenderDropdown(false);
-                        }}
-                      >
-                        <Text style={styles.dropdownText}>{g}</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                )}
+                  {showGenderDropdown && (
+                    <View style={styles.dropdownList}>
+                      {["Male", "Female", "Other"].map((g) => (
+                        <TouchableOpacity
+                          key={g}
+                          style={styles.dropdownItem}
+                          onPress={() => {
+                            setGender(g);
+                            setShowGenderDropdown(false);
+                          }}
+                        >
+                          <Text style={styles.dropdownText}>{g}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
+                </View>
               </View>
+
+              <Text style={styles.sectionTitle}>Personal Details</Text>
+
+              <View style={styles.row}>
+                <InputField
+                  label="Height (cm)"
+                  value={height}
+                  setValue={setHeight}
+                  numeric
+                  containerStyle={styles.colHalf}
+                  theme={theme}
+                />
+                <InputField
+                  label="Weight (kg)"
+                  value={weight}
+                  setValue={setWeight}
+                  numeric
+                  containerStyle={styles.colHalf}
+                  theme={theme}
+                />
+              </View>
+
+              <View style={styles.row}>
+                <InputField
+                  label="Pulse Rate"
+                  value={pulseRate}
+                  setValue={setPulseRate}
+                  numeric
+                  containerStyle={styles.colHalf}
+                  theme={theme}
+                />
+                <InputField
+                  label="BP Systolic"
+                  value={bpSystolic}
+                  setValue={setBpSystolic}
+                  numeric
+                  containerStyle={styles.colHalf}
+                  theme={theme}
+                />
+              </View>
+
+              <InputField
+                label="BP Diastolic"
+                value={bpDiastolic}
+                setValue={setBpDiastolic}
+                numeric
+                theme={theme}
+              />
+
+              <InputField
+                label="FBS (mg/dl)"
+                value={fbs}
+                setValue={setFbs}
+                numeric
+                theme={theme}
+              />
+
+              <InputField
+                label="PPBS (mg/dl)"
+                value={ppbs}
+                setValue={setPpbs}
+                numeric
+                theme={theme}
+              />
+
+              <SectionTextarea
+                label="Medical History"
+                value={medicalHistory}
+                setValue={setMedicalHistory}
+                placeholder="Describe any past conditions..."
+                theme={theme}
+              />
+              <SectionTextarea
+                label="Symptoms"
+                required
+                value={symptoms}
+                setValue={setSymptoms}
+                placeholder="Describe symptoms..."
+                theme={theme}
+              />
+
+              <TouchableOpacity
+                style={styles.predictButton}
+                onPress={handlePredict}
+                disabled={loadingPredict}
+                activeOpacity={0.8}
+              >
+                {loadingPredict ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.predictButtonText}>📊 Predict</Text>
+                )}
+              </TouchableOpacity>
             </View>
 
-            <Text style={styles.sectionTitle}>Optional Data</Text>
-            <View style={styles.row}>
-              <InputField
-                label="Height (cm)"
-                numeric
-                value={height}
-                setValue={setHeight}
-                containerStyle={styles.colHalf}
-                theme={theme}
-              />
-              <InputField
-                label="Weight (kg)"
-                numeric
-                value={weight}
-                setValue={setWeight}
-                containerStyle={styles.colHalf}
-                theme={theme}
-              />
-            </View>
-
-            <View style={styles.row}>
-              <InputField
-                label="Pulse Rate"
-                numeric
-                value={pulseRate}
-                setValue={setPulseRate}
-                containerStyle={styles.colHalf}
-                theme={theme}
-              />
-              <InputField
-                label="BP Systolic"
-                numeric
-                value={bpSystolic}
-                setValue={setBpSystolic}
-                containerStyle={styles.colHalf}
-                theme={theme}
-              />
-            </View>
-
-            <InputField
-              label="BP Diastolic"
-              numeric
-              value={bpDiastolic}
-              setValue={setBpDiastolic}
-              theme={theme}
-            />
-            <InputField
-              label="FBS (mg/dl)"
-              numeric
-              value={fbs}
-              setValue={setFbs}
-              theme={theme}
-            />
-            <InputField
-              label="PPBS (mg/dl)"
-              numeric
-              value={ppbs}
-              setValue={setPpbs}
-              theme={theme}
-            />
-
-            <SectionTextarea
-              label="Medical History"
-              value={medicalHistory}
-              setValue={setMedicalHistory}
-              placeholder="Describe past conditions..."
-              theme={theme}
-            />
-            <SectionTextarea
-              label="Symptoms"
-              required
-              value={symptoms}
-              setValue={setSymptoms}
-              placeholder="Describe symptoms like pain, fever, cough..."
-              theme={theme}
-            />
-
-            <TouchableOpacity
-              style={styles.predictButton}
-              onPress={handlePredict}
-              disabled={loadingPredict}
-            >
-              {loadingPredict ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <Text style={styles.predictButtonText}>📊 Predict</Text>
-              )}
-            </TouchableOpacity>
-
-            {/* Result card */}
             {predictionResult && (
               <View style={styles.resultBox}>
                 <View
                   style={{
                     flexDirection: "row",
                     justifyContent: "space-between",
-                    alignItems: "center",
                   }}
                 >
                   <View style={{ flex: 1 }}>
@@ -695,11 +644,11 @@ export default function PredictionScreen() {
                       {predictionResult.Predicted_Disease}
                     </Text>
                     <Text style={styles.resultSub}>
-                      Tap expand to view full explanation & recommendations
+                      Tap to expand more info
                     </Text>
                   </View>
 
-                  <View style={{ alignItems: "center", marginLeft: 12 }}>
+                  <View style={{ alignItems: "center" }}>
                     <ConfidenceBadge
                       percent={confidencePercent}
                       theme={theme}
@@ -713,271 +662,268 @@ export default function PredictionScreen() {
                   </View>
                 </View>
 
-                {/* Accordion with full explanation */}
-                <Accordion
-                  title="Why the model predicted & Remedies"
-                  theme={theme}
-                >
-                  <View>
-                    <Text
-                      style={{
-                        fontWeight: "800",
-                        marginBottom: 8,
-                        color: theme === "dark" ? "#fff" : "#111",
+                <Accordion title="Explanation & Remedies" theme={theme}>
+                  <Text
+                    style={{
+                      fontWeight: "800",
+                      marginBottom: 10,
+                      color: theme === "dark" ? "#fff" : "#111",
+                    }}
+                  >
+                    Why the model predicted this:
+                  </Text>
+
+                  <PrettyExplanation
+                    text={predictionResult.Explanation}
+                    theme={theme}
+                  />
+
+                  <Text
+                    style={{
+                      fontWeight: "800",
+                      marginTop: 20,
+                      marginBottom: 10,
+                      color: theme === "dark" ? "#fff" : "#111",
+                    }}
+                  >
+                    Ayurvedic Remedies:
+                  </Text>
+
+                  <PrettyExplanation
+                    text={predictionResult.Explanation}
+                    theme={theme}
+                  />
+
+                  <View
+                    style={{ flexDirection: "row", gap: 10, marginTop: 20 }}
+                  >
+                    <TouchableOpacity
+                      onPress={() => {
+                        setFeedbackChoice(true);
+                        setFeedbackModalVisible(true);
                       }}
-                    >
-                      Why the model predicted
-                    </Text>
-                    <PrettyExplanation
-                      text={predictionResult.Explanation || ""}
-                      theme={theme}
-                    />
-
-                    <View style={{ height: 12 }} />
-
-                    <Text
                       style={{
-                        fontWeight: "800",
-                        marginBottom: 8,
-                        color: theme === "dark" ? "#fff" : "#111",
+                        paddingVertical: 10,
+                        paddingHorizontal: 14,
+                        borderRadius: 8,
+                        borderWidth: 1,
+                        borderColor: "#2ecc40",
                       }}
+                      activeOpacity={0.7}
                     >
-                      Ayurvedic Home Remedies & Lifestyle
-                    </Text>
-                    <PrettyExplanation
-                      text={predictionResult.Explanation || ""}
-                      theme={theme}
-                    />
+                      <Text style={{ color: "#2ecc40", fontWeight: "700" }}>
+                        Correct
+                      </Text>
+                    </TouchableOpacity>
 
-                    {/* Feedback row (separate - opens modal) */}
-                    <View
+                    <TouchableOpacity
+                      onPress={() => {
+                        setFeedbackChoice(false);
+                        setFeedbackModalVisible(true);
+                      }}
                       style={{
-                        flexDirection: "row",
-                        marginTop: 18,
-                        justifyContent: "flex-end",
+                        paddingVertical: 10,
+                        paddingHorizontal: 14,
+                        borderRadius: 8,
+                        borderWidth: 1,
+                        borderColor: "#f39c12",
                       }}
+                      activeOpacity={0.7}
                     >
-                      <TouchableOpacity
-                        onPress={() => openFeedbackModal(true)}
-                        style={{
-                          paddingVertical: 8,
-                          paddingHorizontal: 12,
-                          borderRadius: 8,
-                          borderWidth: 1,
-                          borderColor: "#2ecc40",
-                          marginRight: 8,
-                        }}
-                      >
-                        <Text style={{ color: "#2ecc40", fontWeight: "700" }}>
-                          Mark as correct
-                        </Text>
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        onPress={() => openFeedbackModal(false)}
-                        style={{
-                          paddingVertical: 8,
-                          paddingHorizontal: 12,
-                          borderRadius: 8,
-                          backgroundColor: "#fff",
-                          borderWidth: 1,
-                          borderColor: "#f39c12",
-                        }}
-                      >
-                        <Text style={{ color: "#f39c12", fontWeight: "700" }}>
-                          Not correct
-                        </Text>
-                      </TouchableOpacity>
-                    </View>
+                      <Text style={{ color: "#f39c12", fontWeight: "700" }}>
+                        Not Correct
+                      </Text>
+                    </TouchableOpacity>
                   </View>
                 </Accordion>
               </View>
             )}
-          </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
+          </ScrollView>
+        </KeyboardAvoidingView>
 
-      {/* Feedback confirmation modal */}
-      <Modal
-        visible={feedbackModalVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setFeedbackModalVisible(false)}
-      >
-        <View style={modalStyles.overlay}>
-          <View
-            style={[
-              modalStyles.card,
-              theme === "dark" ? { backgroundColor: "#111" } : {},
-            ]}
+        <Modal visible={feedbackModalVisible} transparent animationType="fade">
+          <TouchableWithoutFeedback
+            onPress={() => setFeedbackModalVisible(false)}
           >
-            <Text
-              style={[
-                modalStyles.title,
-                theme === "dark" ? { color: "#fff" } : {},
-              ]}
-            >
-              {feedbackChoice
-                ? "Confirm — Mark as correct"
-                : "Confirm — Mark as not correct"}
-            </Text>
-            <Text
-              style={[
-                modalStyles.text,
-                theme === "dark" ? { color: "#ddd" } : {},
-              ]}
-            >
-              Are you sure you want to submit this feedback? It will help
-              improve model performance.
-            </Text>
-
-            <View
-              style={{
-                flexDirection: "row",
-                justifyContent: "flex-end",
-                marginTop: 18,
-              }}
-            >
-              <Pressable
-                onPress={() => {
-                  setFeedbackModalVisible(false);
-                  setFeedbackChoice(null);
-                }}
-                style={({ pressed }) => [
-                  modalStyles.btn,
-                  {
-                    marginRight: 10,
-                    backgroundColor: "#fff",
-                    borderWidth: 1,
-                    borderColor: "#ccc",
-                  },
-                  pressed && { opacity: 0.8 },
-                ]}
-              >
-                <Text style={{ color: "#333", fontWeight: "700" }}>Cancel</Text>
-              </Pressable>
-
-              <Pressable
-                onPress={submitFeedback}
-                style={({ pressed }) => [
-                  modalStyles.btn,
-                  { backgroundColor: "#2ecc40" },
-                  pressed && { opacity: 0.8 },
-                ]}
-              >
-                {feedbackSubmitting ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <Text style={{ color: "#fff", fontWeight: "800" }}>
-                    Confirm
+            <View style={modalStyles.overlay}>
+              <TouchableWithoutFeedback>
+                <View
+                  style={[
+                    modalStyles.card,
+                    theme === "dark" && { backgroundColor: "#111" },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      modalStyles.title,
+                      theme === "dark" && { color: "#fff" },
+                    ]}
+                  >
+                    Confirm Feedback
                   </Text>
-                )}
-              </Pressable>
+                  <Text
+                    style={[
+                      modalStyles.text,
+                      theme === "dark" && { color: "#ddd" },
+                    ]}
+                  >
+                    Are you sure you want to mark this as{" "}
+                    {feedbackChoice ? "Correct" : "Not Correct"}?
+                  </Text>
+
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      justifyContent: "flex-end",
+                      marginTop: 20,
+                      gap: 10,
+                    }}
+                  >
+                    <Pressable
+                      onPress={() => setFeedbackModalVisible(false)}
+                      style={[
+                        modalStyles.btn,
+                        {
+                          backgroundColor: "#fff",
+                          borderWidth: 1,
+                          borderColor: "#ccc",
+                        },
+                      ]}
+                    >
+                      <Text style={{ fontWeight: "700", color: "#333" }}>
+                        Cancel
+                      </Text>
+                    </Pressable>
+
+                    <Pressable
+                      onPress={submitFeedback}
+                      style={[modalStyles.btn, { backgroundColor: "#2ecc40" }]}
+                    >
+                      <Text style={{ fontWeight: "700", color: "#fff" }}>
+                        Submit
+                      </Text>
+                    </Pressable>
+                  </View>
+                </View>
+              </TouchableWithoutFeedback>
             </View>
-          </View>
-        </View>
-      </Modal>
-    </View>
+          </TouchableWithoutFeedback>
+        </Modal>
+      </View>
+    </TouchableWithoutFeedback>
   );
 }
 
-/* ============================================================
-   Styles
-   ============================================================ */
+/* GLOBAL INPUT STYLES */
 const stylesGlobal = StyleSheet.create({
-  input: {
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 15,
-    borderColor: "#ccc",
-    marginBottom: 8,
-    backgroundColor: "#f5f6f7",
-  },
-  textarea: {
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 15,
-    minHeight: 80,
-    borderColor: "#ccc",
-    backgroundColor: "#f5f6f7",
-  },
   label: {
     fontSize: 15,
     marginBottom: 6,
     color: "#222",
+    fontWeight: "600",
   },
   required: {
     color: "#e74c3c",
     fontWeight: "700",
   },
+  input: {
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    backgroundColor: "#f5f6f7",
+    borderColor: "#ccc",
+    marginBottom: 8,
+    fontSize: 15,
+  },
+  textarea: {
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 12,
+    minHeight: 80,
+    borderColor: "#ccc",
+    backgroundColor: "#f5f6f7",
+    fontSize: 15,
+    textAlignVertical: "top",
+  },
 });
 
+/* THEMATIC STYLES */
 function getStyles(theme: any) {
   const isDark = theme === "dark";
+
   return StyleSheet.create({
     container: {
       flex: 1,
       backgroundColor: isDark ? "#0f0f10" : "#f5f6f7",
     },
-    scrollContent: {
-      padding: 16,
-    },
     card: {
-      backgroundColor: isDark ? "#121212" : "#ffffff",
-      borderRadius: 16,
+      backgroundColor: isDark ? "#121212" : "#fff",
       padding: 20,
+      borderRadius: 16,
+      elevation: 4,
       shadowColor: "#000",
-      shadowOpacity: 0.08,
-      shadowRadius: 10,
-      elevation: 6,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 8,
     },
     sectionTitle: {
       fontSize: 18,
       fontWeight: "700",
-      marginTop: 6,
-      marginBottom: 12,
       color: isDark ? "#fff" : "#0b3d91",
+      marginBottom: 12,
+      marginTop: 8,
     },
     row: {
       flexDirection: "row",
       gap: 12,
       marginBottom: 12,
     },
-    colHalf: {
-      flex: 1,
-    },
+    colHalf: { flex: 1 },
     dropdown: {
       borderWidth: 1,
       borderRadius: 8,
       padding: 12,
-      borderColor: isDark ? "#333" : "#ccc",
       backgroundColor: isDark ? "#181a1b" : "#f5f6f7",
+      borderColor: isDark ? "#333" : "#ccc",
     },
     dropdownText: {
       fontSize: 15,
       color: isDark ? "#fff" : "#222",
     },
     dropdownList: {
-      marginTop: 6,
-      borderRadius: 10,
-      overflow: "hidden",
+      position: "absolute",
+      top: 52,
+      left: 0,
+      right: 0,
+      backgroundColor: isDark ? "#181a1b" : "#fff",
       borderWidth: 1,
       borderColor: isDark ? "#444" : "#ccc",
-      backgroundColor: isDark ? "#181a1b" : "#fff",
+      borderRadius: 10,
+      overflow: "hidden",
+      zIndex: 999,
+      elevation: 20,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.3,
+      shadowRadius: 8,
     },
     dropdownItem: {
       padding: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: isDark ? "#333" : "#f0f0f0",
     },
     predictButton: {
-      marginTop: 14,
       backgroundColor: "#2ecc40",
       paddingVertical: 14,
       borderRadius: 12,
       alignItems: "center",
+      marginTop: 12,
+      elevation: 3,
+      shadowColor: "#2ecc40",
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.3,
+      shadowRadius: 4,
     },
     predictButtonText: {
       color: "#fff",
@@ -985,12 +931,17 @@ function getStyles(theme: any) {
       fontWeight: "800",
     },
     resultBox: {
-      marginTop: 20,
+      marginTop: 16,
+      padding: 18,
       borderRadius: 14,
-      padding: 16,
-      backgroundColor: isDark ? "#0d0d0d" : "#f3fbff",
+      backgroundColor: isDark ? "#0d0d0d" : "#f0f9ff",
       borderWidth: 1,
       borderColor: isDark ? "#222" : "#d7eefc",
+      elevation: 3,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 6,
     },
     resultTitle: {
       fontSize: 16,
@@ -1001,50 +952,47 @@ function getStyles(theme: any) {
       fontSize: 20,
       fontWeight: "900",
       color: isDark ? "#fff" : "#0b3d91",
-      marginTop: 6,
+      marginTop: 4,
       marginBottom: 4,
     },
     resultSub: {
       fontSize: 12,
-      color: isDark ? "#9aa" : "#666",
-    },
-    resultLine: {
-      fontSize: 15,
-      marginBottom: 6,
-      color: isDark ? "#ccc" : "#333",
+      color: isDark ? "#aaa" : "#666",
     },
   });
 }
 
-const styles = getStyles({}); // default for inline components to not break types
+/* MODAL STYLE */
 const modalStyles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: "rgba(6,10,20,0.6)",
-    alignItems: "center",
+    backgroundColor: "rgba(0,0,0,0.6)",
     justifyContent: "center",
     padding: 20,
   },
   card: {
-    width: "100%",
-    maxWidth: 460,
     backgroundColor: "#fff",
+    padding: 20,
     borderRadius: 12,
-    padding: 18,
     elevation: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
   },
   title: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: "800",
-    marginBottom: 8,
-    color: "#111",
+    marginBottom: 10,
   },
-  text: { fontSize: 14, color: "#444" },
+  text: {
+    fontSize: 14,
+    color: "#444",
+    lineHeight: 20,
+  },
   btn: {
     paddingVertical: 10,
     paddingHorizontal: 14,
     borderRadius: 8,
   },
 });
-
-const stylesGlobalRef = stylesGlobal; // keep linter happy (we used stylesGlobal above)

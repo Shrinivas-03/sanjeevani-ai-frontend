@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import {
   Image,
-  Keyboard,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -16,7 +15,8 @@ import {
 import { useAppTheme } from "@/context/theme";
 import { useAuth } from "@/context/auth";
 import BrandHeader from "@/components/brand-header";
-import { sendMessage, startConversation } from "@/constants/api";
+import { sendMessage } from "@/constants/api";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const assistantAvatar = require("../../assets/images/icon.png");
 const userAvatar = require("../../assets/images/logo.png");
@@ -27,6 +27,7 @@ export default function WebChatPage() {
   const { theme } = useAppTheme();
   const { user } = useAuth();
   const styles = getStyles(theme);
+  const insets = useSafeAreaInsets();
 
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
@@ -34,7 +35,7 @@ export default function WebChatPage() {
   const [conversationId, setConversationId] = useState<string | undefined>();
   const scrollViewRef = useRef<ScrollView | null>(null);
 
-  // Animation for "Thinking..."
+  // Thinking animation
   const dotAnim = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     if (loading) {
@@ -56,306 +57,268 @@ export default function WebChatPage() {
     return () => dotAnim.stopAnimation();
   }, [loading]);
 
+  // Auto-scroll
   useEffect(() => {
-    if (scrollViewRef.current) {
-      scrollViewRef.current.scrollToEnd({ animated: true });
-    }
+    scrollViewRef.current?.scrollToEnd({ animated: true });
   }, [messages]);
 
-  // Core conversation logic
+  // Send message
   const handleSend = async () => {
     if (!input.trim() || loading || !user?.email) return;
+
     const userText = input.trim();
+
     setMessages((m) => [
       ...m,
-      { id: `${Date.now()}`, sender: "user", text: userText },
+      { id: Date.now().toString(), sender: "user", text: userText },
     ]);
+
     setInput("");
     setLoading(true);
+
     try {
       const data = await sendMessage(user.email, userText, conversationId);
+
       setConversationId(data.conversation_id);
-      const assistantText = data.response ?? "No response text.";
-      setMessages((m) => [
-        ...m,
-        { id: `${Date.now()}-a`, sender: "assistant", text: assistantText },
-      ]);
-    } catch (e) {
+      const assistantText = data.response ?? "No response.";
+
       setMessages((m) => [
         ...m,
         {
-          id: `${Date.now()}-e`,
+          id: Date.now().toString() + "-a",
           sender: "assistant",
-          text: "Sorry, I could not fetch a remedy at this time.",
+          text: assistantText,
         },
       ]);
-      console.error(e);
+    } catch (err) {
+      console.error(err);
+      setMessages((m) => [
+        ...m,
+        {
+          id: Date.now().toString() + "-e",
+          sender: "assistant",
+          text: "Sorry, something went wrong.",
+        },
+      ]);
     } finally {
       setLoading(false);
     }
   };
 
-  function renderChatMessages() {
-    return (
-      <ScrollView
-        ref={scrollViewRef}
-        contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-      >
-        {messages.length === 0 && (
-          <View style={{ flex: 1, alignItems: "center", marginVertical: 36 }}>
-            <Text style={styles.placeholderText}>Start a conversation!</Text>
-          </View>
-        )}
-        {messages.map((msg, idx) => (
+  // Render chat bubbles
+  const renderChatMessages = () => (
+    <ScrollView
+      ref={scrollViewRef}
+      contentContainerStyle={styles.scrollContent}
+      keyboardShouldPersistTaps="handled"
+      showsVerticalScrollIndicator={false}
+    >
+      {messages.length === 0 && (
+        <View style={{ marginTop: 40, alignItems: "center" }}>
+          <Text style={styles.placeholderText}>Start a conversation!</Text>
+        </View>
+      )}
+
+      {messages.map((msg) => (
+        <View
+          key={msg.id}
+          style={[
+            styles.bubbleRow,
+            msg.sender === "assistant" ? styles.bubbleLeft : styles.bubbleRight,
+          ]}
+        >
+          {msg.sender === "assistant" && (
+            <Image source={assistantAvatar} style={styles.bubbleAvatar} />
+          )}
+
           <View
-            key={msg.id}
             style={[
-              styles.bubbleRow,
+              styles.bubble,
               msg.sender === "assistant"
-                ? styles.bubbleLeft
-                : styles.bubbleRight,
+                ? styles.bubbleAssistant
+                : styles.bubbleUser,
             ]}
           >
-            {msg.sender === "assistant" && (
-              <Image source={assistantAvatar} style={styles.bubbleAvatar} />
-            )}
-            <View
-              style={[
-                styles.bubble,
+            <Text
+              style={
                 msg.sender === "assistant"
-                  ? styles.bubbleAssistant
-                  : styles.bubbleUser,
-              ]}
+                  ? styles.bubbleAssistantText
+                  : styles.bubbleUserText
+              }
             >
-              <Text
-                style={
-                  msg.sender === "assistant"
-                    ? styles.bubbleAssistantText
-                    : styles.bubbleUserText
-                }
-              >
-                {msg.text}
-              </Text>
-            </View>
-            {msg.sender === "user" && (
-              <Image source={userAvatar} style={styles.bubbleAvatar} />
-            )}
+              {msg.text}
+            </Text>
           </View>
-        ))}
-        {loading && (
-          <View style={[styles.bubbleRow, styles.bubbleLeft]}>
-            <Image source={assistantAvatar} style={styles.bubbleAvatar} />
-            <View style={[styles.bubble, styles.bubbleAssistant]}>
-              <Animated.Text style={styles.bubbleAssistantText}>
-                {"Thinking" + ".".repeat(dotAnim.__getValue() % 4)}
-              </Animated.Text>
-            </View>
-          </View>
-        )}
-      </ScrollView>
-    );
-  }
 
-  const mainChat = (
-    <SafeAreaView style={styles.outerBg}>
-      <BrandHeader />
-      <View style={styles.flexBox}>
-        <KeyboardAvoidingView
-          style={styles.innerBoxNoGap}
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
-          keyboardVerticalOffset={0}
-        >
-          <View style={styles.chatArea}>{renderChatMessages()}</View>
-          {/* Input bar absolutely at the bottom, no extra margin */}
-          <View style={styles.inputBarOuter}>
-            <View style={styles.inputBar}>
-              <TextInput
-                style={styles.input}
-                value={input}
-                onChangeText={setInput}
-                placeholder="Type your message"
-                placeholderTextColor={theme === "dark" ? "#A7B992" : "#67b375"}
-                onSubmitEditing={handleSend}
-                returnKeyType="send"
-              />
-              <TouchableOpacity
-                style={[
-                  styles.sendButton,
-                  input.trim() ? styles.sendActive : styles.sendDisabled,
-                ]}
-                onPress={handleSend}
-                disabled={!input.trim() || loading}
-                activeOpacity={0.82}
-              >
-                <Text style={styles.sendButtonText}>➤</Text>
-              </TouchableOpacity>
-            </View>
+          {msg.sender === "user" && (
+            <Image source={userAvatar} style={styles.bubbleAvatar} />
+          )}
+        </View>
+      ))}
+
+      {loading && (
+        <View style={[styles.bubbleRow, styles.bubbleLeft]}>
+          <Image source={assistantAvatar} style={styles.bubbleAvatar} />
+          <View style={[styles.bubble, styles.bubbleAssistant]}>
+            <Animated.Text style={styles.bubbleAssistantText}>
+              {"Thinking" + ".".repeat(dotAnim.__getValue() % 4)}
+            </Animated.Text>
           </View>
-        </KeyboardAvoidingView>
-      </View>
-    </SafeAreaView>
+        </View>
+      )}
+    </ScrollView>
   );
 
-  return mainChat;
+  return (
+    <SafeAreaView style={styles.outerBg}>
+      {/* HEADER OUTSIDE KAV — prevents black screen */}
+      <BrandHeader />
+
+      {/* KAV WRAPS ONLY CHAT + INPUT */}
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? insets.top + 60 : 0}
+      >
+        <View style={styles.chatArea}>{renderChatMessages()}</View>
+
+        <View style={[styles.inputBarOuter, { paddingBottom: insets.bottom }]}>
+          <View style={styles.inputBar}>
+            <TextInput
+              style={styles.input}
+              value={input}
+              onChangeText={setInput}
+              placeholder="Type your message"
+              placeholderTextColor={theme === "dark" ? "#A7B992" : "#67b375"}
+              onSubmitEditing={handleSend}
+              returnKeyType="send"
+            />
+
+            <TouchableOpacity
+              style={[
+                styles.sendButton,
+                input.trim() ? styles.sendActive : styles.sendDisabled,
+              ]}
+              onPress={handleSend}
+              disabled={!input.trim() || loading}
+            >
+              <Text style={styles.sendButtonText}>➤</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
+  );
 }
 
 function getStyles(theme: string) {
   const isDark = theme === "dark";
+
   return StyleSheet.create({
     outerBg: {
       flex: 1,
       backgroundColor: isDark ? "#17191b" : "#f6f7fa",
-      alignItems: "stretch",
-      justifyContent: "flex-end",
-      minHeight: "100%",
-      width: "100%",
     },
-    flexBox: {
-      flex: 1,
-      width: "100%",
-      alignItems: "stretch",
-      justifyContent: "flex-end",
-    },
-    innerBoxNoGap: {
-      flex: 1,
-      width: "100%",
-      justifyContent: "flex-end",
-      alignItems: "stretch",
-    },
+
     chatArea: {
       flex: 1,
-      width: "100%",
       maxWidth: 610,
+      width: "100%",
       alignSelf: "center",
-      paddingBottom: 0,
-      marginBottom: 0,
-      justifyContent: "flex-end",
     },
+
     scrollContent: {
-      flexGrow: 1,
-      justifyContent: "flex-end",
+      paddingHorizontal: 12,
+      paddingBottom: 18,
       paddingTop: 20,
-      paddingHorizontal: 10,
-      paddingBottom: 8,
     },
+
     placeholderText: {
       color: isDark ? "#b2c8b6" : "#689c77",
       fontSize: 17,
       fontWeight: "500",
-      opacity: 0.85,
-      marginTop: 8,
-      textAlign: "center",
     },
+
     bubbleRow: {
       flexDirection: "row",
-      alignItems: "flex-end",
       marginBottom: 15,
-      paddingHorizontal: 3,
-      maxWidth: "100%",
+      alignItems: "flex-end",
     },
-    bubbleLeft: {
-      justifyContent: "flex-start",
-      alignSelf: "flex-start",
-    },
-    bubbleRight: {
-      flexDirection: "row-reverse",
-      alignSelf: "flex-end",
-      justifyContent: "flex-end",
-    },
+
+    bubbleLeft: { alignSelf: "flex-start" },
+    bubbleRight: { alignSelf: "flex-end", flexDirection: "row-reverse" },
+
     bubble: {
       paddingHorizontal: 16,
-      paddingVertical: 11,
-      minWidth: 55,
+      paddingVertical: 10,
       borderRadius: 18,
-      maxWidth: "82%",
-      elevation: 2,
-      marginHorizontal: 4,
+      maxWidth: "80%",
+      marginHorizontal: 6,
     },
-    bubbleAssistant: {
-      backgroundColor: isDark ? "#28292f" : "#ececf0",
-      borderTopLeftRadius: 7,
-      borderBottomLeftRadius: 7,
-      alignSelf: "flex-start",
-    },
+
+    bubbleAssistant: { backgroundColor: isDark ? "#28292f" : "#ececf0" },
     bubbleUser: {
       backgroundColor: isDark
         ? "rgba(203,120,255,0.22)"
         : "rgba(150,105,250,0.18)",
-      borderTopRightRadius: 7,
-      borderBottomRightRadius: 7,
-      alignSelf: "flex-end",
     },
+
     bubbleAssistantText: {
-      color: isDark ? "#f3f7ea" : "#23282b",
+      color: isDark ? "#f2f7ea" : "#222",
       fontSize: 16.3,
-      fontWeight: "500",
-      lineHeight: 23,
+      lineHeight: 22,
     },
+
     bubbleUserText: {
-      color: isDark ? "#fcf6fd" : "#453054",
+      color: isDark ? "#fff" : "#432d57",
       fontSize: 16.3,
-      fontWeight: "500",
-      lineHeight: 23,
+      lineHeight: 22,
     },
+
     bubbleAvatar: {
       width: 24,
       height: 24,
-      borderRadius: 16,
-      marginLeft: 2,
-      marginRight: 2,
+      borderRadius: 12,
     },
+
     inputBarOuter: {
-      width: "100%",
+      paddingHorizontal: 10,
       backgroundColor: "transparent",
-      alignItems: "center",
-      justifyContent: "flex-end",
-      paddingBottom: 2, // Remove any extra padding or margin!
     },
+
     inputBar: {
       flexDirection: "row",
       alignItems: "center",
-      backgroundColor: isDark ? "#232435" : "#f7fafc",
-      borderRadius: 28,
+      backgroundColor: isDark ? "#232435" : "#ffffff",
+      borderRadius: 30,
       paddingLeft: 16,
-      paddingRight: 4,
-      paddingVertical: 6,
-      width: "97%",
-      alignSelf: "center",
+      paddingRight: 6,
+      paddingVertical: 8,
       elevation: 3,
-      shadowColor: "#111",
-      shadowOpacity: 0.08,
-      shadowRadius: 5,
     },
+
     input: {
       flex: 1,
-      backgroundColor: "transparent",
-      borderRadius: 20,
-      paddingHorizontal: 8,
-      paddingVertical: 10,
       fontSize: 16.5,
       color: isDark ? "#f2f8f1" : "#222a2c",
-      marginRight: 6,
-      borderWidth: 0,
     },
+
     sendButton: {
-      backgroundColor: "#9654fa",
-      borderRadius: 22,
       width: 44,
       height: 44,
+      borderRadius: 22,
       alignItems: "center",
       justifyContent: "center",
-      marginLeft: 1,
+      backgroundColor: "#9654fa",
     },
+
     sendActive: { opacity: 1 },
-    sendDisabled: { opacity: 0.38 },
+    sendDisabled: { opacity: 0.4 },
+
     sendButtonText: {
       color: "#fff",
-      fontSize: 24,
+      fontSize: 22,
       fontWeight: "bold",
-      marginBottom: 0,
-      letterSpacing: 0.5,
     },
   });
 }

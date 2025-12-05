@@ -1,5 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { Animated, Easing, Image, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useRef, useState } from "react";
+import { Animated, Easing, Image, StyleSheet, Text, View } from "react-native";
 
 type SplashScreenProps = {
   onFinish: () => void;
@@ -7,7 +7,7 @@ type SplashScreenProps = {
 
 export default function SplashScreen({ onFinish }: SplashScreenProps) {
   const [visible, setVisible] = useState(true);
-  const [titleLetters, setTitleLetters] = useState('');
+  const [titleLetters, setTitleLetters] = useState("");
   const [showTagline, setShowTagline] = useState(false);
   const logoAnim = useRef(new Animated.Value(0)).current;
   const flashAnim = useRef(new Animated.Value(0)).current;
@@ -18,7 +18,6 @@ export default function SplashScreen({ onFinish }: SplashScreenProps) {
   const glowAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    // Background gradient animation
     Animated.loop(
       Animated.sequence([
         Animated.timing(backgroundAnim, {
@@ -33,7 +32,7 @@ export default function SplashScreen({ onFinish }: SplashScreenProps) {
           useNativeDriver: false,
           easing: Easing.inOut(Easing.sin),
         }),
-      ])
+      ]),,
     ).start();
 
     // Glow effect animation
@@ -51,7 +50,7 @@ export default function SplashScreen({ onFinish }: SplashScreenProps) {
           useNativeDriver: true,
           easing: Easing.inOut(Easing.sin),
         }),
-      ])
+      ]),,
     ).start();
 
     // Logo entrance with enhanced animations
@@ -84,7 +83,7 @@ export default function SplashScreen({ onFinish }: SplashScreenProps) {
           easing: Easing.out(Easing.exp),
         }),
       ]),
-    ]).start();
+"",    ]).start();
 
     // Pulse effect after logo appears
     setTimeout(() => {
@@ -102,12 +101,12 @@ export default function SplashScreen({ onFinish }: SplashScreenProps) {
             useNativeDriver: true,
             easing: Easing.inOut(Easing.sin),
           }),
-        ])
+        ]),
       ).start();
     }, 1000);
 
     // Letter-by-letter animation for title with enhanced timing
-    const title = 'Sanjeevani AI';
+    const title = "Sanjeevani AI";
     let i = 0;
     const interval = setInterval(() => {
       setTitleLetters(title.slice(0, i + 1));
@@ -138,18 +137,27 @@ export default function SplashScreen({ onFinish }: SplashScreenProps) {
       }
     }, 4000 / title.length);
     return () => clearInterval(interval);
-  }, [logoAnim, flashAnim, taglineAnim, pulseAnim, rotateAnim, backgroundAnim, glowAnim, onFinish]);
+  }, [
+    logoAnim,
+    flashAnim,
+    taglineAnim,
+    pulseAnim,
+    rotateAnim,
+    backgroundAnim,
+    glowAnim,
+    onFinish,
+  ]);
 
   if (!visible) return null;
 
   return (
-    <Animated.View 
+    <Animated.View
       style={[
         styles.container,
         {
           backgroundColor: backgroundAnim.interpolate({
             inputRange: [0, 1],
-            outputRange: ['#f7fafc', '#e8f4f8'],
+            outputRange: ["#f7fafc", "#e8f4f8"],
           }),
         },
       ]}
@@ -157,7 +165,7 @@ export default function SplashScreen({ onFinish }: SplashScreenProps) {
       {/* Glow effect behind the logo */}
       <Animated.View
         style={{
-          position: 'absolute',
+          position: "absolute",
           opacity: glowAnim.interpolate({
             inputRange: [0, 1],
             outputRange: [0.3, 0.8],
@@ -185,13 +193,13 @@ export default function SplashScreen({ onFinish }: SplashScreenProps) {
                   inputRange: [0, 1],
                   outputRange: [0.7, 1],
                 }),
-                pulseAnim
+                pulseAnim,
               ),
             },
             {
               rotate: rotateAnim.interpolate({
                 inputRange: [0, 1],
-                outputRange: ['0deg', '360deg'],
+                outputRange: ["0deg", "360deg"],
               }),
             },
           ],
@@ -206,7 +214,7 @@ export default function SplashScreen({ onFinish }: SplashScreenProps) {
           }}
         >
           <Image
-            source={require('@/assets/images/logo.png')}
+            source={require("@/assets/images/logo.png")}
             style={styles.logo}
             resizeMode="contain"
           />
@@ -220,7 +228,9 @@ export default function SplashScreen({ onFinish }: SplashScreenProps) {
           <View style={styles.flaskContainer}>
             {/* Simple flask icon using SVG path or emoji for demo */}
             <Text style={styles.flaskIcon}>🧪</Text>
-            <Text style={styles.tagline}>A personal HealthCare from Ayurveda</Text>
+            <Text style={styles.tagline}>
+              A personal HealthCare from Ayurveda
+            </Text>
           </View>
         </Animated.View>
       )}
@@ -231,9 +241,9 @@ export default function SplashScreen({ onFinish }: SplashScreenProps) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#f7fafc',
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#f7fafc",
   },
   logo: {
     width: 200,
@@ -243,15 +253,15 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 32,
-    fontWeight: 'bold',
-    color: '#0a7ea4',
-    textAlign: 'center',
+    fontWeight: "bold",
+    color: "#0a7ea4",
+    textAlign: "center",
     letterSpacing: 1,
   },
   flaskContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     gap: 8,
   },
   flaskIcon: {
@@ -260,15 +270,15 @@ const styles = StyleSheet.create({
   },
   tagline: {
     fontSize: 16,
-    color: '#687076',
-    textAlign: 'center',
-    fontStyle: 'italic',
+    color: "#687076",
+    textAlign: "center",
+    fontStyle: "italic",
   },
   glowEffect: {
     width: 240,
     height: 240,
     borderRadius: 120,
-    backgroundColor: '#0a7ea4',
+    backgroundColor: "#0a7ea4",
     opacity: 0.1,
   },
 });

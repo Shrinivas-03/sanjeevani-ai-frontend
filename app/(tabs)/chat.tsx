@@ -26,17 +26,20 @@ type Msg = { id: string; sender: "user" | "assistant"; text: string };
 export default function WebChatPage() {
   const { theme } = useAppTheme();
   const { user } = useAuth();
-  const styles = getStyles(theme);
   const insets = useSafeAreaInsets();
+  const styles = getStyles(theme);
 
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [conversationId, setConversationId] = useState<string | undefined>();
-  const scrollViewRef = useRef<ScrollView | null>(null);
+  const scrollRef = useRef<ScrollView | null>(null);
 
-  // Thinking animation
+  // -----------------------------
+  // Typing / Thinking Animation
+  // -----------------------------
   const dotAnim = useRef(new Animated.Value(0)).current;
+
   useEffect(() => {
     if (loading) {
       Animated.loop(
@@ -59,17 +62,19 @@ export default function WebChatPage() {
 
   // Auto-scroll
   useEffect(() => {
-    scrollViewRef.current?.scrollToEnd({ animated: true });
+    scrollRef.current?.scrollToEnd({ animated: true });
   }, [messages]);
 
-  // Send message
+  // -----------------------------
+  // Send Message
+  // -----------------------------
   const handleSend = async () => {
     if (!input.trim() || loading || !user?.email) return;
 
     const userText = input.trim();
 
-    setMessages((m) => [
-      ...m,
+    setMessages((prev) => [
+      ...prev,
       { id: Date.now().toString(), sender: "user", text: userText },
     ]);
 
@@ -78,26 +83,25 @@ export default function WebChatPage() {
 
     try {
       const data = await sendMessage(user.email, userText, conversationId);
-
       setConversationId(data.conversation_id);
-      const assistantText = data.response ?? "No response.";
 
-      setMessages((m) => [
-        ...m,
+      const assistantReply = data.response || "No response.";
+
+      setMessages((prev) => [
+        ...prev,
         {
           id: Date.now().toString() + "-a",
           sender: "assistant",
-          text: assistantText,
+          text: assistantReply,
         },
       ]);
-    } catch (err) {
-      console.error(err);
-      setMessages((m) => [
-        ...m,
+    } catch (e) {
+      setMessages((prev) => [
+        ...prev,
         {
           id: Date.now().toString() + "-e",
           sender: "assistant",
-          text: "Sorry, something went wrong.",
+          text: "Something went wrong.",
         },
       ]);
     } finally {
@@ -105,45 +109,49 @@ export default function WebChatPage() {
     }
   };
 
-  // Render chat bubbles
-  const renderChatMessages = () => (
+  // -----------------------------
+  // Render Messages
+  // -----------------------------
+  const renderMessages = () => (
     <ScrollView
-      ref={scrollViewRef}
-      contentContainerStyle={styles.scrollContent}
+      ref={scrollRef}
+      contentContainerStyle={styles.messagesContainer}
       keyboardShouldPersistTaps="handled"
       showsVerticalScrollIndicator={false}
     >
+      {/* Placeholder */}
       {messages.length === 0 && (
         <View style={{ marginTop: 40, alignItems: "center" }}>
-          <Text style={styles.placeholderText}>Start a conversation!</Text>
+          <Text style={styles.placeholder}>Start a conversation...</Text>
         </View>
       )}
 
+      {/* Chat Messages */}
       {messages.map((msg) => (
         <View
           key={msg.id}
           style={[
-            styles.bubbleRow,
-            msg.sender === "assistant" ? styles.bubbleLeft : styles.bubbleRight,
+            styles.row,
+            msg.sender === "assistant" ? styles.rowLeft : styles.rowRight,
           ]}
         >
           {msg.sender === "assistant" && (
-            <Image source={assistantAvatar} style={styles.bubbleAvatar} />
+            <Image source={assistantAvatar} style={styles.avatar} />
           )}
 
           <View
             style={[
               styles.bubble,
               msg.sender === "assistant"
-                ? styles.bubbleAssistant
-                : styles.bubbleUser,
+                ? styles.assistantBubble
+                : styles.userBubble,
             ]}
           >
             <Text
               style={
                 msg.sender === "assistant"
-                  ? styles.bubbleAssistantText
-                  : styles.bubbleUserText
+                  ? styles.assistantText
+                  : styles.userText
               }
             >
               {msg.text}
@@ -151,16 +159,17 @@ export default function WebChatPage() {
           </View>
 
           {msg.sender === "user" && (
-            <Image source={userAvatar} style={styles.bubbleAvatar} />
+            <Image source={userAvatar} style={styles.avatar} />
           )}
         </View>
       ))}
 
+      {/* Typing Animation */}
       {loading && (
-        <View style={[styles.bubbleRow, styles.bubbleLeft]}>
-          <Image source={assistantAvatar} style={styles.bubbleAvatar} />
-          <View style={[styles.bubble, styles.bubbleAssistant]}>
-            <Animated.Text style={styles.bubbleAssistantText}>
+        <View style={[styles.row, styles.rowLeft]}>
+          <Image source={assistantAvatar} style={styles.avatar} />
+          <View style={[styles.bubble, styles.assistantBubble]}>
+            <Animated.Text style={styles.assistantText}>
               {"Thinking" + ".".repeat(dotAnim.__getValue() % 4)}
             </Animated.Text>
           </View>
@@ -170,39 +179,36 @@ export default function WebChatPage() {
   );
 
   return (
-    <SafeAreaView style={styles.outerBg}>
-      {/* HEADER OUTSIDE KAV — prevents black screen */}
+    <SafeAreaView style={styles.page}>
       <BrandHeader />
 
-      {/* KAV WRAPS ONLY CHAT + INPUT */}
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
         keyboardVerticalOffset={Platform.OS === "ios" ? insets.top + 60 : 0}
       >
-        <View style={styles.chatArea}>{renderChatMessages()}</View>
+        <View style={styles.chatWrapper}>{renderMessages()}</View>
 
-        <View style={[styles.inputBarOuter, { paddingBottom: insets.bottom }]}>
+        <View style={[styles.inputWrapper, { paddingBottom: insets.bottom }]}>
           <View style={styles.inputBar}>
             <TextInput
-              style={styles.input}
               value={input}
               onChangeText={setInput}
-              placeholder="Type your message"
-              placeholderTextColor={theme === "dark" ? "#A7B992" : "#67b375"}
+              placeholder="Type your message..."
+              placeholderTextColor={isDark(theme) ? "#A5C8A6" : "#4F8F63"}
+              style={styles.input}
               onSubmitEditing={handleSend}
-              returnKeyType="send"
             />
 
             <TouchableOpacity
-              style={[
-                styles.sendButton,
-                input.trim() ? styles.sendActive : styles.sendDisabled,
-              ]}
               onPress={handleSend}
               disabled={!input.trim() || loading}
+              style={[
+                styles.sendBtn,
+                input.trim() ? styles.sendEnabled : styles.sendDisabled,
+              ]}
             >
-              <Text style={styles.sendButtonText}>➤</Text>
+              <Text style={styles.sendIcon}>➤</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -211,113 +217,135 @@ export default function WebChatPage() {
   );
 }
 
+const isDark = (t: string) => t === "dark";
+
+// -----------------------------
+// NEW DESIGN STYLES APPLIED
+// -----------------------------
 function getStyles(theme: string) {
-  const isDark = theme === "dark";
+  const dark = isDark(theme);
 
   return StyleSheet.create({
-    outerBg: {
+    page: {
       flex: 1,
-      backgroundColor: isDark ? "#17191b" : "#f6f7fa",
+      backgroundColor: dark ? "#0c0f0d" : "#eef5ef",
     },
 
-    chatArea: {
+    chatWrapper: {
       flex: 1,
-      maxWidth: 610,
+      maxWidth: 600,
       width: "100%",
       alignSelf: "center",
     },
 
-    scrollContent: {
-      paddingHorizontal: 12,
-      paddingBottom: 18,
-      paddingTop: 20,
+    messagesContainer: {
+      paddingHorizontal: 14,
+      paddingTop: 16,
+      paddingBottom: 20,
     },
 
-    placeholderText: {
-      color: isDark ? "#b2c8b6" : "#689c77",
-      fontSize: 17,
+    placeholder: {
+      color: dark ? "#9EBCA0" : "#5F8B65",
+      fontSize: 16,
       fontWeight: "500",
     },
 
-    bubbleRow: {
+    row: {
       flexDirection: "row",
-      marginBottom: 15,
+      marginBottom: 14,
       alignItems: "flex-end",
     },
+    rowLeft: { alignSelf: "flex-start" },
+    rowRight: { alignSelf: "flex-end", flexDirection: "row-reverse" },
 
-    bubbleLeft: { alignSelf: "flex-start" },
-    bubbleRight: { alignSelf: "flex-end", flexDirection: "row-reverse" },
+    avatar: {
+      width: 26,
+      height: 26,
+      borderRadius: 13,
+      borderWidth: 1.2,
+      borderColor: dark ? "#2ECC71" : "#0F7A38",
+    },
 
     bubble: {
-      paddingHorizontal: 16,
-      paddingVertical: 10,
-      borderRadius: 18,
-      maxWidth: "80%",
-      marginHorizontal: 6,
+      maxWidth: "78%",
+      paddingHorizontal: 18,
+      paddingVertical: 12,
+      borderRadius: 20,
+      marginHorizontal: 8,
+      shadowColor: dark ? "#0aff71" : "#3BBF78",
+      shadowOpacity: dark ? 0.22 : 0.1,
+      shadowRadius: 10,
+      shadowOffset: { width: 0, height: 4 },
+      elevation: 4,
     },
 
-    bubbleAssistant: { backgroundColor: isDark ? "#28292f" : "#ececf0" },
-    bubbleUser: {
-      backgroundColor: isDark
-        ? "rgba(203,120,255,0.22)"
-        : "rgba(150,105,250,0.18)",
+    assistantBubble: {
+      backgroundColor: dark ? "#1a1d1c" : "#f0f5f1",
+      borderWidth: 1,
+      borderColor: dark ? "#213329" : "#d8f3df",
     },
 
-    bubbleAssistantText: {
-      color: isDark ? "#f2f7ea" : "#222",
-      fontSize: 16.3,
+    userBubble: {
+      backgroundColor: dark ? "rgba(60,200,90,0.22)" : "rgba(34,197,94,0.18)",
+      borderWidth: 1,
+      borderColor: dark ? "#1f5d39" : "#b8ebc8",
+    },
+
+    assistantText: {
+      color: dark ? "#e7ffe9" : "#2a3d31",
+      fontSize: 16,
       lineHeight: 22,
     },
 
-    bubbleUserText: {
-      color: isDark ? "#fff" : "#432d57",
-      fontSize: 16.3,
+    userText: {
+      color: dark ? "#ffffff" : "#0a4225",
+      fontSize: 16,
       lineHeight: 22,
     },
 
-    bubbleAvatar: {
-      width: 24,
-      height: 24,
-      borderRadius: 12,
-    },
-
-    inputBarOuter: {
-      paddingHorizontal: 10,
-      backgroundColor: "transparent",
+    inputWrapper: {
+      paddingHorizontal: 14,
+      backgroundColor: dark ? "#0c0f0d" : "#eef5ef",
     },
 
     inputBar: {
       flexDirection: "row",
       alignItems: "center",
-      backgroundColor: isDark ? "#232435" : "#ffffff",
+      backgroundColor: dark ? "#0e1310" : "#ffffff",
       borderRadius: 30,
-      paddingLeft: 16,
+      borderWidth: 1.6,
+      borderColor: dark ? "#1f3b26" : "#7ed9a0",
+      paddingLeft: 18,
       paddingRight: 6,
       paddingVertical: 8,
-      elevation: 3,
+      shadowColor: "#2ECC71",
+      shadowOpacity: 0.18,
+      shadowRadius: 10,
+      elevation: 5,
     },
 
     input: {
       flex: 1,
+      color: dark ? "#e8ffe1" : "#1c362a",
       fontSize: 16.5,
-      color: isDark ? "#f2f8f1" : "#222a2c",
+      paddingVertical: 8,
     },
 
-    sendButton: {
-      width: 44,
-      height: 44,
-      borderRadius: 22,
+    sendBtn: {
+      width: 46,
+      height: 46,
+      borderRadius: 23,
       alignItems: "center",
       justifyContent: "center",
-      backgroundColor: "#9654fa",
+      backgroundColor: "#22c55e",
     },
 
-    sendActive: { opacity: 1 },
-    sendDisabled: { opacity: 0.4 },
+    sendEnabled: { opacity: 1 },
+    sendDisabled: { opacity: 0.45 },
 
-    sendButtonText: {
+    sendIcon: {
       color: "#fff",
-      fontSize: 22,
+      fontSize: 20,
       fontWeight: "bold",
     },
   });

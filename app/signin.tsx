@@ -2,9 +2,11 @@ import { API_BASE_URL } from "@/constants/api";
 import { useAuth } from "@/context/auth";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Alert,
+  Animated,
+  Easing,
   Image,
   KeyboardAvoidingView,
   Platform,
@@ -20,17 +22,43 @@ export default function SignInScreen({ onSignUp }: { onSignUp?: () => void }) {
   const colorScheme = useColorScheme() ?? "light";
   const isDark = colorScheme === "dark";
   const styles = getStyles(isDark);
-  const { login, setUser } = useAuth();
+  const { login } = useAuth();
   const router = require("expo-router").useRouter();
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
+  // Animation
+  const cardOpacity = useRef(new Animated.Value(0)).current;
+  const cardTranslateY = useRef(new Animated.Value(30)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(cardOpacity, {
+        toValue: 1,
+        duration: 450,
+        easing: Easing.out(Easing.ease),
+        useNativeDriver: true,
+      }),
+      Animated.timing(cardTranslateY, {
+        toValue: 0,
+        duration: 450,
+        easing: Easing.out(Easing.ease),
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
+
+  // ---------------------
+  // LOGIN
+  // ---------------------
   const handleLogin = async () => {
     if (!email || !password) {
       Alert.alert("Error", "Please enter both email and password");
       return;
     }
+
     setLoading(true);
     try {
       const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
@@ -41,136 +69,135 @@ export default function SignInScreen({ onSignUp }: { onSignUp?: () => void }) {
         },
         body: JSON.stringify({ email, password }),
       });
+
       const data = await response.json();
+
       if (response.ok && data.access_token) {
         await AsyncStorage.setItem("access_token", data.access_token);
         await AsyncStorage.setItem("refresh_token", data.refresh_token);
+
         await login(data.user);
-        if (Platform.OS === "web") {
-          router.replace("/web/prediction");
-        } else {
-          router.replace("/(tabs)/prediction");
-        }
+
+        if (Platform.OS === "web") router.replace("/web/prediction");
+        else router.replace("/(tabs)/prediction");
       } else if (data?.message?.toLowerCase().includes("verify")) {
         if (Platform.OS === "web") {
           router.push({ pathname: "/otp-verification", params: { email } });
         } else {
-          Alert.alert(
-            "Email Not Verified",
-            "Please verify your email before logging in.",
-          );
+          Alert.alert("Email Not Verified", "Please verify your email.");
         }
       } else {
         Alert.alert("Error", data?.message || "Login failed.");
       }
-    } catch (error) {
-      console.error("[SignIn] Error:", error);
+    } catch (err) {
+      console.error("Login error:", err);
       Alert.alert("Error", "Failed to connect to server.");
     } finally {
       setLoading(false);
     }
   };
 
-  // Clean skip handler
+  // SKIP LOGIN
   const handleSkip = async () => {
     await login();
-    if (Platform.OS === "web") {
-      router.replace("/web/prediction");
-    } else {
-      router.replace("/(tabs)/prediction");
-    }
+    Platform.OS === "web"
+      ? router.replace("/web/prediction")
+      : router.replace("/(tabs)/prediction");
   };
 
+  // HOME
   const handleHomePress = () => {
-    if (Platform.OS === "web") {
-      router.replace("/web");
-    } else {
-      router.replace("/signin");
-    }
+    Platform.OS === "web" ? router.replace("/web") : router.replace("/signin");
   };
 
   return (
     <KeyboardAvoidingView
       style={styles.root}
       behavior={Platform.OS === "ios" ? "padding" : "height"}
-      keyboardVerticalOffset={0}
     >
-      <ScrollView
-        contentContainerStyle={{ flexGrow: 1 }}
-        keyboardShouldPersistTaps="handled"
-      >
-        <View style={styles.card}>
-          <View style={styles.brandRow}>
-            <View
-              style={[
-                styles.logoCircle,
-                { borderColor: isDark ? "#1e2022" : "#ffffff" },
-              ]}
-            >
+      <TouchableOpacity style={styles.homeButton} onPress={handleHomePress}>
+        <Text style={styles.homeButtonText}>Home</Text>
+      </TouchableOpacity>
+
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        <View style={styles.centerWrapper}>
+          <Animated.View
+            style={[
+              styles.card,
+              {
+                opacity: cardOpacity,
+                transform: [{ translateY: cardTranslateY }],
+              },
+            ]}
+          >
+            {/* Logo Overlap */}
+            <View style={styles.logoWrapper}>
               <Image
                 source={require("../assets/images/logo.png")}
                 style={styles.logo}
                 resizeMode="contain"
               />
             </View>
-            <Text style={styles.brandTitle}>Sanjeevani AI</Text>
-          </View>
-          <Text style={styles.title}>Welcome Back!</Text>
-          <Text style={styles.subtitle}>
-            Log in to continue your health journey.
-          </Text>
-          <View style={styles.formGroup}>
-            <Text style={styles.label}>Email Address</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="you@example.com"
-              keyboardType="email-address"
-              autoCapitalize="none"
-              placeholderTextColor={isDark ? "#888" : "#aaa"}
-              value={email}
-              onChangeText={setEmail}
-            />
-          </View>
-          <View style={styles.formGroup}>
-            <Text style={styles.label}>Password</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Enter your password"
-              secureTextEntry
-              placeholderTextColor={isDark ? "#888" : "#aaa"}
-              value={password}
-              onChangeText={setPassword}
-            />
-          </View>
-          <TouchableOpacity
-            style={[styles.button, loading && { opacity: 0.6 }]}
-            onPress={handleLogin}
-            disabled={loading}
-          >
-            <Text style={styles.buttonText}>
-              {loading ? "Logging in..." : "Login"}
+
+            <Text style={styles.title}>Welcome back</Text>
+            <Text style={styles.subtitle}>
+              Sign in to continue your health journey.
             </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.button, { backgroundColor: "#aaa", marginTop: 8 }]}
-            onPress={handleSkip}
-            disabled={loading}
-          >
-            <Text style={[styles.buttonText, { color: "#fff" }]}>
-              Skip for now
-            </Text>
-          </TouchableOpacity>
-          <Text style={styles.signupText}>
-            Don't have an account?{" "}
-            <Text
-              style={styles.signupLink}
-              onPress={() =>
-                onSignUp ? onSignUp() : router.replace("/signup")
-              }
+
+            <View style={styles.formGroup}>
+              <Text style={styles.label}>Email address</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="you@example.com"
+                keyboardType="email-address"
+                autoCapitalize="none"
+                placeholderTextColor={isDark ? "#6b7280" : "#9ca3af"}
+                value={email}
+                onChangeText={setEmail}
+              />
+            </View>
+
+            <View style={styles.formGroup}>
+              <Text style={styles.label}>Password</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Enter your password"
+                secureTextEntry
+                placeholderTextColor={isDark ? "#6b7280" : "#9ca3af"}
+                value={password}
+                onChangeText={setPassword}
+              />
+            </View>
+
+            <TouchableOpacity
+              style={[styles.buttonPrimary, loading && { opacity: 0.7 }]}
+              onPress={handleLogin}
+              disabled={loading}
             >
-              Sign up
+              <Text style={styles.buttonPrimaryText}>
+                {loading ? "Logging in..." : "Login"}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.buttonGhost, loading && { opacity: 0.7 }]}
+              onPress={handleSkip}
+            >
+              <Text style={styles.buttonGhostText}>Skip for now</Text>
+            </TouchableOpacity>
+
+            <Text style={styles.signupText}>
+              Don't have an account?{" "}
+              <Text
+                style={styles.signupLink}
+                onPress={() =>
+                  onSignUp ? onSignUp() : router.replace("/signup")
+                }
+              >
+                Sign up
+              </Text>
             </Text>
-          </Text>
+          </Animated.View>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -178,130 +205,153 @@ export default function SignInScreen({ onSignUp }: { onSignUp?: () => void }) {
 }
 
 function getStyles(isDark: boolean) {
+  const primary = "#22c55e";
+
   return StyleSheet.create({
     root: {
       flex: 1,
-      backgroundColor: isDark ? "#151718" : "#f7fafc",
-      padding: 16,
+      backgroundColor: isDark ? "#020617" : "#e2f3ea",
     },
-    headerText: {
-      fontSize: 20,
-      fontWeight: "600",
-      color: isDark ? "#fff" : "#000",
-      paddingHorizontal: 16,
-      paddingTop: 16,
-      paddingBottom: 8,
+    scrollContent: {
+      flexGrow: 1,
+      justifyContent: "center",
+      paddingHorizontal: 20,
+      paddingVertical: 32,
     },
-    card: {
-      alignSelf: "center",
+    centerWrapper: {
       width: "100%",
-      maxWidth: 360,
-      backgroundColor: isDark ? "#222" : "#fff",
-      borderRadius: 16,
-      padding: 24,
+      alignItems: "center",
+    },
+
+    logoWrapper: {
+      position: "absolute",
+      top: -48,
+      width: 95,
+      height: 95,
+      borderRadius: 48,
+      borderWidth: 2,
+      borderColor: primary,
+      backgroundColor: isDark ? "#020617" : "#ecfdf3",
+      alignItems: "center",
+      justifyContent: "center",
+      overflow: "hidden",
+      alignSelf: "center",
+    },
+
+    logo: { width: "80%", height: "80%" },
+
+    card: {
+      width: "100%",
+      maxWidth: 400,
+      backgroundColor: isDark
+        ? "rgba(15,23,42,0.98)"
+        : "rgba(255,255,255,0.98)",
+      paddingVertical: 24,
+      paddingHorizontal: 22,
+      paddingTop: 70,
+      borderRadius: 26,
+      marginTop: 80,
       shadowColor: "#000",
-      shadowOpacity: 0.08,
-      shadowRadius: 12,
-      elevation: 4,
-      marginTop: "auto",
-      marginBottom: "auto",
+      shadowOpacity: 0.22,
+      shadowRadius: 26,
+      shadowOffset: { width: 0, height: 14 },
+      elevation: 12,
+      borderWidth: 1,
+      borderColor: isDark ? "rgba(148,163,184,0.35)" : "rgba(148,163,184,0.25)",
     },
-    brandRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "center",
-      marginBottom: 12,
-    },
-    logoCircle: {
-      width: 44,
-      height: 44,
-      borderRadius: 22,
-      backgroundColor: "#2ecc40",
-      alignItems: "center",
-      justifyContent: "center",
-      borderWidth: 3,
-      marginRight: 10,
-    },
-    logo: {
-      width: 26,
-      height: 26,
-    },
-    brandTitle: {
-      fontSize: 26,
-      fontWeight: "bold",
-      color: "#2ecc40",
-      letterSpacing: 0.5,
-    },
+
     title: {
-      fontSize: 28,
-      fontWeight: "bold",
-      color: "#2ecc40",
+      fontSize: 22,
+      fontWeight: "700",
       textAlign: "center",
-      marginBottom: 4,
+      color: isDark ? "#e5e7eb" : "#0f172a",
     },
     subtitle: {
-      fontSize: 15,
-      color: isDark ? "#aaa" : "#687076",
+      fontSize: 13,
       textAlign: "center",
       marginBottom: 18,
+      color: isDark ? "#9ca3af" : "#6b7280",
     },
-    formGroup: {
-      marginBottom: 14,
-    },
+
+    formGroup: { marginBottom: 14 },
     label: {
-      fontSize: 15,
-      color: isDark ? "#eee" : "#222",
+      fontSize: 13,
+      fontWeight: "500",
       marginBottom: 6,
+      color: isDark ? "#e5e7eb" : "#111827",
     },
     input: {
-      backgroundColor: isDark ? "#181a1b" : "#f3f4f6",
-      color: isDark ? "#fff" : "#222",
-      borderRadius: 8,
-      paddingHorizontal: 12,
-      paddingVertical: Platform.OS === "web" ? 10 : 8,
-      fontSize: 15,
+      borderRadius: 999,
       borderWidth: 1,
-      borderColor: isDark ? "#333" : "#e0e0e0",
-    },
-    button: {
-      backgroundColor: "#2ecc40",
-      borderRadius: 8,
-      paddingVertical: 12,
-      marginTop: 10,
-      marginBottom: 8,
-    },
-    buttonText: {
-      color: "#fff",
-      fontWeight: "bold",
-      fontSize: 17,
-      textAlign: "center",
-    },
-    signupText: {
-      textAlign: "center",
-      color: isDark ? "#aaa" : "#687076",
+      borderColor: isDark ? "#1f2937" : "#e5e7eb",
+      backgroundColor: isDark ? "#020617" : "#f8fafc",
+      paddingHorizontal: 14,
+      paddingVertical: 11,
       fontSize: 15,
+      color: isDark ? "#f9fafb" : "#0f172a",
+    },
+
+    buttonPrimary: {
+      backgroundColor: primary,
+      borderRadius: 999,
+      paddingVertical: 12,
+      marginTop: 12,
+      shadowColor: primary,
+      shadowOpacity: 0.35,
+      shadowOffset: { width: 0, height: 8 },
+      shadowRadius: 16,
+      elevation: 4,
+    },
+    buttonPrimaryText: {
+      color: "#fff",
+      fontWeight: "700",
+      fontSize: 16,
+      textAlign: "center",
+    },
+
+    buttonGhost: {
+      borderRadius: 999,
+      paddingVertical: 11,
+      borderWidth: 1,
+      borderColor: isDark ? "#374151" : "#d1d5db",
+      backgroundColor: isDark ? "rgba(15,23,42,0.7)" : "rgba(248,250,252,0.9)",
       marginTop: 8,
     },
-    signupLink: {
-      color: "#2ecc40",
-      fontWeight: "bold",
+    buttonGhostText: {
+      textAlign: "center",
+      fontSize: 14,
+      fontWeight: "600",
+      color: isDark ? "#e5e7eb" : "#111827",
     },
+
+    signupText: {
+      textAlign: "center",
+      marginTop: 12,
+      color: isDark ? "#9ca3af" : "#6b7280",
+    },
+    signupLink: {
+      color: primary,
+      fontWeight: "700",
+    },
+
     homeButton: {
       position: "absolute",
       top: 16,
       left: 16,
-      paddingHorizontal: 16,
-      paddingVertical: 8,
-      backgroundColor: isDark ? "#1f2937" : "#ffffff",
-      borderRadius: 8,
+      zIndex: 100,
+      paddingVertical: 7,
+      paddingHorizontal: 14,
+      borderRadius: 999,
       borderWidth: 1,
-      borderColor: isDark ? "#2a2d2e" : "#e0e0e0",
-      zIndex: 10,
+      backgroundColor: isDark
+        ? "rgba(15,23,42,0.95)"
+        : "rgba(255,255,255,0.95)",
+      borderColor: isDark ? "#1f2937" : "#e5e7eb",
     },
     homeButtonText: {
-      color: isDark ? "#e5e7eb" : "#111827",
+      fontSize: 13,
       fontWeight: "600",
-      fontSize: 15,
+      color: isDark ? "#e5e7eb" : "#111827",
     },
   });
 }

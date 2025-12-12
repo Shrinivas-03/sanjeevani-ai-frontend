@@ -16,7 +16,7 @@ import {
 
 type Props = {
   subtitle?: string;
-  mode?: "landing" | "authenticated"; // landing = Features/About/Contact, authenticated = Chat/Prediction/Profile
+  mode?: "landing" | "authenticated";
   showBackButton?: boolean;
   onMenuPress?: () => void;
 };
@@ -27,16 +27,15 @@ export default function BrandHeader({
   showBackButton = false,
   onMenuPress,
 }: Props) {
-  const [menuOpen, setMenuOpen] = useState(false);
   const { theme } = useAppTheme();
   const { isAuthenticated, logout, user } = useAuth();
-  const isDark = theme === "dark";
   const { width } = useWindowDimensions();
   const isMobile = width < 768;
+  const isDark = theme === "dark";
 
-  // Debug logging
-  console.log("[BrandHeader] isAuthenticated:", isAuthenticated, "user:", user);
+  const [menuOpen, setMenuOpen] = useState(false);
 
+  /** NAVIGATION ITEMS */
   const baseNavItems = [
     { label: "Home", href: "/web" },
     { label: "Features", href: "/web/features" },
@@ -50,114 +49,101 @@ export default function BrandHeader({
     { label: "Profile", href: "/web/profile" },
   ];
 
-  // When authenticated, show ONLY Chat and Profile
   const navItems = isAuthenticated ? authenticatedOnlyItems : baseNavItems;
 
-  const handleLogout = () => {
-    // Clear tokens from storage
-    clearTokens();
-    // Update auth context
-    logout();
-    // Redirect to home
+  const handleLogoPress = () => {
     if (Platform.OS === "web") {
       router.replace("/web");
     } else {
-      router.replace("/signin");
+      router.replace(isAuthenticated ? "/(tabs)/prediction" : "/signin");
     }
+  };
+
+  const handleLogout = () => {
+    clearTokens();
+    logout();
+    Platform.OS === "web" ? router.replace("/web") : router.replace("/signin");
   };
 
   return (
     <View
       style={[
-        styles.container,
-        { backgroundColor: isDark ? "#151718" : "#f5f6f7" },
+        styles.wrapper,
+        { backgroundColor: isDark ? "#020617" : "#eef9f2" },
       ]}
     >
-      <View style={styles.row}>
-        {showBackButton ? (
-          <TouchableOpacity onPress={() => router.back()}>
-            <Text style={{ color: isDark ? "#fff" : "#000", fontSize: 18 }}>
-              {"< Back"}
-            </Text>
-          </TouchableOpacity>
-        ) : onMenuPress && Platform.OS !== "web" ? (
-          <TouchableOpacity
-            onPress={onMenuPress}
-            style={styles.menuButton}
-            aria-label="Menu"
-          >
-            <Text
-              style={{ color: isDark ? "#e5e7eb" : "#111827", fontSize: 24 }}
-            >
-              ☰
-            </Text>
-          </TouchableOpacity>
-        ) : onMenuPress && Platform.OS === "web" ? (
-          <TouchableOpacity
-            onPress={onMenuPress}
-            style={styles.menuButton}
-            aria-label="Menu"
-          >
-            <Text
-              style={{ color: isDark ? "#e5e7eb" : "#111827", fontSize: 24 }}
-            >
-              ☰
-            </Text>
-          </TouchableOpacity>
-        ) : (
-          <TouchableOpacity
-            onPress={() => {
-              if (Platform.OS === "web") {
-                router.replace("/web");
-              } else {
-                // On native: go to tabs if authenticated, else signin
-                if (isAuthenticated) {
-                  router.replace("/(tabs)/prediction" as any);
-                } else {
-                  router.replace("/signin");
-                }
-              }
-            }}
-            style={styles.leftRow}
-          >
-            <View
-              style={[
-                styles.logoCircle,
-                { borderColor: isDark ? "#1e2022" : "#ffffff" },
-              ]}
-            >
+      {/* HEADER BAR */}
+      <View
+        style={[
+          styles.headerBar,
+          {
+            backgroundColor: isDark ? "#020617" : "#eef9f2",
+            shadowColor: "#000",
+          },
+        ]}
+      >
+        {/* LEFT SIDE */}
+        <View style={styles.left}>
+          {showBackButton ? (
+            <TouchableOpacity onPress={() => router.back()}>
+              <Text
+                style={{
+                  color: isDark ? "#e5e7eb" : "#0f172a",
+                  fontSize: 18,
+                  fontWeight: "600",
+                }}
+              >
+                {"‹ Back"}
+              </Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity onPress={handleLogoPress} style={styles.logoWrap}>
               <Image
                 source={require("@/assets/images/logo.png")}
                 style={styles.logo}
                 resizeMode="contain"
               />
-            </View>
-            <Text style={styles.title}>Sanjeevani AI</Text>
-          </TouchableOpacity>
-        )}
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-          {/* Desktop/tablet: show inline nav links */}
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {/* CENTER TITLE */}
+        <View style={styles.center}>
+          <Text style={styles.title}>
+            <Text style={styles.titleGreen}>SANJEEVANI</Text>
+            <Text style={styles.titleGold}> AI</Text>
+          </Text>
+
+          {subtitle ? (
+            <Text
+              style={[
+                styles.subtitle,
+                { color: isDark ? "#94a3b8" : "#63726b" },
+              ]}
+            >
+              {subtitle}
+            </Text>
+          ) : null}
+        </View>
+
+        {/* RIGHT SIDE */}
+        <View style={styles.right}>
           {Platform.OS === "web" && !isMobile && (
             <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                gap: 12,
-                marginRight: 8,
-              }}
+              style={{ flexDirection: "row", alignItems: "center", gap: 12 }}
             >
+              {/* NAV ITEMS */}
               {navItems.map((item) => (
                 <TouchableOpacity
                   key={item.href}
                   onPress={() => router.replace(item.href as any)}
-                  style={{
-                    paddingHorizontal: 12,
-                    paddingVertical: 6,
-                    borderRadius: 8,
-                    borderWidth: 1,
-                    borderColor: isDark ? "#2a2d2e" : "#e0e0e0",
-                    backgroundColor: isDark ? "#1f2937" : "#ffffff",
-                  }}
+                  style={[
+                    styles.navBtn,
+                    {
+                      borderColor: isDark ? "#334155" : "#d1d5db",
+                      backgroundColor: isDark ? "#0f172a" : "#ffffff",
+                    },
+                  ]}
                 >
                   <Text
                     style={{
@@ -169,123 +155,83 @@ export default function BrandHeader({
                   </Text>
                 </TouchableOpacity>
               ))}
+
+              {/* AUTH BUTTONS */}
+              {!isAuthenticated && (
+                <>
+                  <TouchableOpacity
+                    onPress={() => router.replace("/signin")}
+                    style={[
+                      styles.navBtn,
+                      {
+                        backgroundColor: isDark ? "#0f172a" : "#ffffff",
+                        borderColor: isDark ? "#334155" : "#d1d5db",
+                      },
+                    ]}
+                  >
+                    <Text
+                      style={{
+                        color: isDark ? "#e5e7eb" : "#111827",
+                        fontWeight: "600",
+                      }}
+                    >
+                      Sign In
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    onPress={() => router.replace("/signup")}
+                    style={styles.primaryBtn}
+                  >
+                    <Text style={{ color: "#fff", fontWeight: "700" }}>
+                      Sign Up
+                    </Text>
+                  </TouchableOpacity>
+                </>
+              )}
+
+              {/* LOGOUT + USER */}
+              {isAuthenticated && (
+                <>
+                  <Text style={styles.userTag}>
+                    {user?.full_name || user?.name || "User"}
+                  </Text>
+                  <ThemeToggle />
+                  <TouchableOpacity
+                    onPress={handleLogout}
+                    style={styles.logoutBtn}
+                  >
+                    <Text style={{ color: "#dc2626", fontWeight: "700" }}>
+                      Logout
+                    </Text>
+                  </TouchableOpacity>
+                </>
+              )}
             </View>
           )}
-          {/* Show Sign In / Sign Up buttons when NOT authenticated */}
-          {!isAuthenticated && Platform.OS === "web" && !isMobile && (
-            <View
-              style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
-            >
-              <TouchableOpacity
-                onPress={() => router.replace("/signin")}
-                style={{
-                  paddingHorizontal: 16,
-                  paddingVertical: 8,
-                  borderRadius: 8,
-                  borderWidth: 1,
-                  borderColor: isDark ? "#2a2d2e" : "#e0e0e0",
-                  backgroundColor: isDark ? "#1f2937" : "#ffffff",
-                }}
-              >
-                <Text
-                  style={{
-                    color: isDark ? "#e5e7eb" : "#111827",
-                    fontWeight: "600",
-                  }}
-                >
-                  Sign In
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => router.replace("/signup")}
-                style={{
-                  paddingHorizontal: 16,
-                  paddingVertical: 8,
-                  borderRadius: 8,
-                  backgroundColor: "#2ecc40",
-                }}
-              >
-                <Text style={{ color: "#ffffff", fontWeight: "bold" }}>
-                  Sign Up
-                </Text>
-              </TouchableOpacity>
-            </View>
-          )}
-          {/* Show user name and Logout button when authenticated */}
-          {isAuthenticated && Platform.OS === "web" && !isMobile && (
-            <View
-              style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
-            >
-              <Text
-                style={{
-                  color: isDark ? "#e5e7eb" : "#111827",
-                  fontWeight: "600",
-                  marginRight: 4,
-                  borderWidth: 1,
-                  borderColor: isDark ? "#2a2d2e" : "#e0e0e0",
-                  paddingHorizontal: 12,
-                  paddingVertical: 6,
-                  borderRadius: 8,
-                }}
-              >
-                {user?.full_name || user?.name || "User"}
-              </Text>
-              <ThemeToggle />
-              <TouchableOpacity
-                onPress={handleLogout}
-                style={{
-                  paddingHorizontal: 16,
-                  paddingVertical: 8,
-                  borderRadius: 8,
-                  borderWidth: 1,
-                  borderColor: "#dc2626",
-                  backgroundColor: isDark ? "#7f1d1d" : "#fef2f2",
-                }}
-              >
-                <Text style={{ color: "#dc2626", fontWeight: "600" }}>
-                  Logout
-                </Text>
-              </TouchableOpacity>
-            </View>
-          )}
-          {isAuthenticated && Platform.OS !== "web" && <ThemeToggle />}
-          {/* Mobile: show hamburger */}
+
+          {/* MOBILE MENU */}
           {Platform.OS === "web" && isMobile && (
             <TouchableOpacity
               onPress={() => setMenuOpen((v) => !v)}
-              style={{
-                paddingHorizontal: 10,
-                paddingVertical: 8,
-                borderRadius: 8,
-                borderWidth: 1,
-                borderColor: isDark ? "#2a2d2e" : "#e0e0e0",
-                backgroundColor: isDark ? "#111827" : "#ffffff",
-              }}
-              aria-label="Menu"
+              style={styles.mobileMenuBtn}
             >
               <Text
-                style={{ color: isDark ? "#e5e7eb" : "#111827", fontSize: 18 }}
+                style={{ fontSize: 22, color: isDark ? "#e5e7eb" : "#111827" }}
               >
                 ☰
               </Text>
             </TouchableOpacity>
           )}
+
+          {/* MOBILE NATIVE ONLY */}
+          {Platform.OS !== "web" && <ThemeToggle />}
         </View>
       </View>
-      {/* Mobile dropdown menu */}
+
+      {/* MOBILE DROPDOWN MENU */}
       {Platform.OS === "web" && isMobile && menuOpen && (
-        <View
-          style={{
-            alignSelf: "flex-end",
-            marginTop: 8,
-            backgroundColor: isDark ? "#111827" : "#ffffff",
-            borderWidth: 1,
-            borderColor: isDark ? "#2a2d2e" : "#e0e0e0",
-            borderRadius: 10,
-            overflow: "hidden",
-            minWidth: 150,
-          }}
-        >
+        <View style={styles.mobileDropdown}>
           {navItems.map((item, index) => (
             <TouchableOpacity
               key={item.href}
@@ -293,12 +239,7 @@ export default function BrandHeader({
                 setMenuOpen(false);
                 router.replace(item.href as any);
               }}
-              style={{
-                paddingHorizontal: 16,
-                paddingVertical: 12,
-                borderTopWidth: index > 0 ? 1 : 0,
-                borderTopColor: isDark ? "#1f2937" : "#f0f0f0",
-              }}
+              style={styles.mobileDropdownItem}
             >
               <Text
                 style={{
@@ -310,146 +251,170 @@ export default function BrandHeader({
               </Text>
             </TouchableOpacity>
           ))}
+
           {!isAuthenticated && (
             <>
               <TouchableOpacity
-                onPress={() => {
-                  setMenuOpen(false);
-                  router.replace("/signin");
-                }}
-                style={{
-                  paddingHorizontal: 16,
-                  paddingVertical: 12,
-                  borderTopWidth: 1,
-                  borderTopColor: isDark ? "#1f2937" : "#f0f0f0",
-                }}
+                onPress={() => router.replace("/signin")}
+                style={styles.mobileDropdownItem}
               >
-                <Text
-                  style={{
-                    color: isDark ? "#e5e7eb" : "#111827",
-                    fontWeight: "600",
-                  }}
-                >
+                <Text style={{ color: "#22c55e", fontWeight: "700" }}>
                   Sign In
                 </Text>
               </TouchableOpacity>
+
               <TouchableOpacity
-                onPress={() => {
-                  setMenuOpen(false);
-                  router.replace("/signup");
-                }}
-                style={{
-                  paddingHorizontal: 16,
-                  paddingVertical: 12,
-                  borderTopWidth: 1,
-                  borderTopColor: isDark ? "#1f2937" : "#f0f0f0",
-                  backgroundColor: "#2ecc40",
-                }}
+                onPress={() => router.replace("/signup")}
+                style={[
+                  styles.mobileDropdownItem,
+                  { backgroundColor: "#22c55e" },
+                ]}
               >
-                <Text style={{ color: "#ffffff", fontWeight: "bold" }}>
+                <Text style={{ color: "#fff", fontWeight: "700" }}>
                   Sign Up
                 </Text>
               </TouchableOpacity>
             </>
           )}
+
           {isAuthenticated && (
-            <>
-              {user?.full_name && (
-                <View
-                  style={{
-                    paddingHorizontal: 16,
-                    paddingVertical: 12,
-                    borderTopWidth: 1,
-                    borderTopColor: isDark ? "#1f2937" : "#f0f0f0",
-                  }}
-                >
-                  <Text
-                    style={{
-                      color: isDark ? "#e5e7eb" : "#111827",
-                      fontWeight: "600",
-                    }}
-                  >
-                    {user.full_name}
-                  </Text>
-                </View>
-              )}
-              <TouchableOpacity
-                onPress={() => {
-                  setMenuOpen(false);
-                  handleLogout();
-                }}
-                style={{
-                  paddingHorizontal: 16,
-                  paddingVertical: 12,
-                  borderTopWidth: 1,
-                  borderTopColor: isDark ? "#1f2937" : "#f0f0f0",
-                  backgroundColor: isDark ? "#7f1d1d" : "#fef2f2",
-                }}
-              >
-                <Text style={{ color: "#dc2626", fontWeight: "600" }}>
-                  Logout
-                </Text>
-              </TouchableOpacity>
-            </>
+            <TouchableOpacity
+              onPress={handleLogout}
+              style={[
+                styles.mobileDropdownItem,
+                { backgroundColor: "#fee2e2" },
+              ]}
+            >
+              <Text style={{ color: "#dc2626", fontWeight: "700" }}>
+                Logout
+              </Text>
+            </TouchableOpacity>
           )}
         </View>
       )}
-      {subtitle ? (
-        <Text style={[styles.subtitle, { color: isDark ? "#aaa" : "#687076" }]}>
-          {subtitle}
-        </Text>
-      ) : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  wrapper: {
     width: "100%",
-    paddingTop: 48,
-    paddingBottom: 8,
+    paddingTop: 28,
+    paddingBottom: 0,
+    alignItems: "center",
+  },
+
+  headerBar: {
+    width: "100%",
+    flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 16,
+    paddingBottom: 12,
+    paddingTop: 8,
+
+    borderBottomLeftRadius: 22,
+    borderBottomRightRadius: 22,
+    borderBottomWidth: 2,
+    borderBottomColor: "rgba(13, 199, 190, 0.85)",
+
+    shadowOpacity: 0.18,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 9,
   },
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    width: "100%",
-  },
-  leftRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    flex: 1,
-  },
-  logoCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: "#2ecc40",
-    alignItems: "center",
+
+  left: {
+    width: 70,
     justifyContent: "center",
-    borderWidth: 3,
-    marginRight: 10,
   },
+
+  logoWrap: {
+    justifyContent: "center",
+    alignItems: "flex-start",
+  },
+
   logo: {
-    width: 26,
-    height: 26,
+    width: 60,
+    height: 60,
   },
+
+  center: {
+    flex: 1,
+    alignItems: "center",
+  },
+
   title: {
-    fontSize: 32,
-    fontWeight: "bold",
-    color: "#2ecc40",
-    letterSpacing: 0.5,
-    flexShrink: 1,
+    fontSize: 26,
+    fontWeight: "900",
+    letterSpacing: 0.6,
   },
+  titleGreen: { color: "#22c55e", fontWeight: "900" },
+  titleGold: { color: "#D4AF37", fontWeight: "900" },
+
   subtitle: {
-    marginTop: 4,
-    fontSize: 16,
+    marginTop: 2,
+    fontSize: 13,
     textAlign: "center",
   },
-  menuButton: {
-    paddingHorizontal: 10,
+
+  right: {
+    width: 70,
+    alignItems: "flex-end",
+    justifyContent: "center",
+  },
+
+  navBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+
+  primaryBtn: {
+    paddingHorizontal: 16,
     paddingVertical: 8,
+    backgroundColor: "#22c55e",
+    borderRadius: 10,
+  },
+
+  userTag: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#22c55e",
+    color: "#22c55e",
+    fontWeight: "700",
+  },
+
+  logoutBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderRadius: 10,
+    borderColor: "#dc2626",
+  },
+
+  mobileMenuBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+
+  mobileDropdown: {
+    width: "60%",
+    alignSelf: "flex-end",
+    marginTop: 6,
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    borderWidth: 1,
+    overflow: "hidden",
+  },
+  mobileDropdownItem: {
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#eee",
   },
 });

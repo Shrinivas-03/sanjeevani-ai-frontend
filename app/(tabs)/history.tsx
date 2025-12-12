@@ -24,19 +24,6 @@ import {
 } from "@/constants/api";
 import { Ionicons } from "@expo/vector-icons";
 
-/**
- * NOTE:
- * This file augments the existing HistoryScreen by adding:
- * - Input bar in the conversation detail view
- * - sendMessageToAi (POST /api/rag/ai-remedy)
- * - Appends user + assistant messages and auto-scrolls
- *
- * No backend changes required.
- */
-
-/* ------------------------
-   Local API helper (ai-remedy)
-   ------------------------ */
 const API_BASE =
   process.env.EXPO_PUBLIC_API_BASE_URL || "http://127.0.0.1:5000";
 const AI_REMEDY_ENDPOINT = `${API_BASE}/api/rag/ai-remedy`;
@@ -54,11 +41,6 @@ async function safeParseResponse(res: Response) {
   }
 }
 
-/**
- * Send message to ai-remedy endpoint.
- * Expects payload: { email, query, conversation_id }
- * Returns the parsed response (defensive to various shapes).
- */
 async function sendMessageToAi(
   email: string,
   query: string,
@@ -78,10 +60,6 @@ async function sendMessageToAi(
 
   return safeParseResponse(res);
 }
-
-/* ------------------------
-   Component
-   ------------------------ */
 
 export default function HistoryScreen() {
   const { theme } = useAppTheme();
@@ -103,7 +81,6 @@ export default function HistoryScreen() {
   }, [user?.email]);
 
   useEffect(() => {
-    // auto-scroll when messages change
     if (scrollViewRef.current && messages.length) {
       setTimeout(() => {
         try {
@@ -118,7 +95,6 @@ export default function HistoryScreen() {
     try {
       if (user?.email) {
         const data = await listConversations(user.email);
-        // defensive: data may be shaped differently
         const convs = data?.conversations ?? data?.data?.conversations ?? [];
         setConvos(Array.isArray(convs) ? convs : []);
       }
@@ -137,7 +113,7 @@ export default function HistoryScreen() {
       if (user?.email) {
         const data = await getConversation(user.email, conversation_id);
         const msgs = data?.messages ?? data?.data?.messages ?? [];
-        // ensure expected shape
+
         setMessages(
           Array.isArray(msgs)
             ? msgs.map((m: any) => ({
@@ -224,7 +200,7 @@ export default function HistoryScreen() {
   async function handleSendMessage() {
     if (!inputText.trim() || !user?.email || !selectedConvo) return;
     const textToSend = inputText.trim();
-    // append user message locally immediately
+
     setMessages((prev) => [...prev, { role: "user", message: textToSend }]);
     setInputText("");
     setSending(true);
@@ -236,7 +212,6 @@ export default function HistoryScreen() {
         selectedConvo,
       );
 
-      // response can be in different shapes; check common fields
       const assistantReply =
         data?.response ??
         data?.data?.response ??
@@ -245,22 +220,12 @@ export default function HistoryScreen() {
         data?.message ??
         "";
 
-      // if ai returns object with 'conversation_id' we could refresh list
-      const returnedCid =
-        data?.conversation_id ?? data?.data?.conversation_id ?? null;
-      if (returnedCid) {
-        // update convos list to reflect previews
-        fetchConvoList();
-      }
-
-      // append assistant message if present
       if (assistantReply && assistantReply !== "") {
         setMessages((prev) => [
           ...prev,
           { role: "assistant", message: String(assistantReply) },
         ]);
       } else {
-        // fallback message
         setMessages((prev) => [
           ...prev,
           {
@@ -278,11 +243,8 @@ export default function HistoryScreen() {
       ]);
     } finally {
       setSending(false);
-      // scroll to end after slight delay
       setTimeout(() => {
-        try {
-          scrollViewRef.current?.scrollToEnd({ animated: true });
-        } catch {}
+        scrollViewRef.current?.scrollToEnd({ animated: true });
       }, 160);
     }
   }
@@ -290,7 +252,10 @@ export default function HistoryScreen() {
   // Theme colors
   const primary = "#2ecc40";
   const accent = theme === "dark" ? "#6ee7b7" : "#388e3c";
-  const bgLight = theme === "dark" ? "#0A1D3B" : "#f3f6fa";
+
+  // UPDATED BACKGROUND COLOR (MATCH SIGNIN / SIGNUP)
+  const bgLight = theme === "dark" ? "#0f0f10" : "#f6f7fa";
+
   const cardBg = theme === "dark" ? "#222428" : "#fff";
 
   return (
@@ -312,6 +277,7 @@ export default function HistoryScreen() {
           >
             Your Chat History
           </Text>
+
           <Pressable
             style={{
               alignSelf: "center",
@@ -322,9 +288,6 @@ export default function HistoryScreen() {
               marginTop: 12,
               marginBottom: 8,
               elevation: 3,
-              shadowColor: "#000",
-              shadowOpacity: 0.1,
-              shadowRadius: 6,
             }}
             onPress={handleDeleteAll}
           >
@@ -378,7 +341,6 @@ export default function HistoryScreen() {
                       padding: 18,
                     }}
                   >
-                    {/* Icon/Avatar */}
                     <View
                       style={{
                         width: 40,
@@ -396,7 +358,7 @@ export default function HistoryScreen() {
                         color="#fff"
                       />
                     </View>
-                    {/* Preview */}
+
                     <View style={{ flex: 1 }}>
                       <Text
                         style={{
@@ -409,14 +371,13 @@ export default function HistoryScreen() {
                             selectedConvo === item.conversation_id
                               ? "bold"
                               : "600",
-                          letterSpacing: 0.04,
                         }}
                         numberOfLines={2}
-                        ellipsizeMode="tail"
                       >
                         {item.preview}
                       </Text>
                     </View>
+
                     <Ionicons
                       name="chevron-forward-outline"
                       size={21}
@@ -442,7 +403,6 @@ export default function HistoryScreen() {
           )}
         </View>
       ) : (
-        // Conversation detail view (now interactive: can send messages)
         <KeyboardAvoidingView
           style={{ flex: 1, backgroundColor: bgLight }}
           behavior={Platform.OS === "ios" ? "padding" : undefined}
@@ -470,9 +430,6 @@ export default function HistoryScreen() {
                   padding: 7,
                   borderRadius: 25,
                   backgroundColor: theme === "dark" ? primary : "#cdf3e4",
-                  shadowColor: "#000",
-                  shadowOpacity: 0.1,
-                  elevation: 2,
                 }}
               >
                 <Ionicons
@@ -481,13 +438,13 @@ export default function HistoryScreen() {
                   color={theme === "dark" ? "#fff" : accent}
                 />
               </Pressable>
+
               <Text
                 style={{
                   fontSize: 20,
                   fontWeight: "bold",
                   color: accent,
                   marginLeft: 3,
-                  letterSpacing: 0.07,
                 }}
               >
                 Conversation
@@ -501,10 +458,6 @@ export default function HistoryScreen() {
                 paddingVertical: 7,
                 borderRadius: 22,
                 backgroundColor: "#E53935",
-                shadowColor: "#000",
-                shadowOpacity: 0.1,
-                shadowRadius: 4,
-                marginLeft: 6,
               }}
             >
               <Text style={{ color: "#fff", fontWeight: "bold", fontSize: 15 }}>
@@ -517,8 +470,7 @@ export default function HistoryScreen() {
             ref={scrollViewRef}
             style={{ flex: 1, padding: 14, backgroundColor: bgLight }}
             contentContainerStyle={{
-              paddingBottom: 16 + 84, // space for input bar
-              minHeight: 460,
+              paddingBottom: 100,
             }}
             showsVerticalScrollIndicator={false}
           >
@@ -537,7 +489,6 @@ export default function HistoryScreen() {
                   textAlign: "center",
                   opacity: 0.7,
                   marginTop: 56,
-                  marginBottom: 36,
                 }}
               >
                 No messages in this thread.
@@ -563,7 +514,6 @@ export default function HistoryScreen() {
                         : theme === "dark"
                           ? "#333"
                           : "#e7e7e7",
-                  alignItems: "flex-start",
                   borderLeftWidth: 5,
                   borderLeftColor:
                     m.role === "assistant"
@@ -571,11 +521,6 @@ export default function HistoryScreen() {
                       : m.role === "user"
                         ? "#0288D1"
                         : "#9e9e9e",
-                  shadowColor: "#000",
-                  shadowOffset: { width: 0, height: 1 },
-                  shadowOpacity: 0.1,
-                  shadowRadius: 2,
-                  elevation: 2,
                 }}
               >
                 <View style={{ flexDirection: "row", alignItems: "center" }}>
@@ -595,20 +540,17 @@ export default function HistoryScreen() {
                           ? "#0288D1"
                           : "#9e9e9e"
                     }
-                    style={{ marginRight: 5, marginTop: -2 }}
+                    style={{ marginRight: 5 }}
                   />
                   <Text
                     style={{
                       fontWeight: "bold",
-                      marginBottom: 4,
                       color:
                         m.role === "user"
                           ? "#0288D1"
                           : m.role === "assistant"
                             ? primary
                             : "#9e9e9e",
-                      letterSpacing: 0.5,
-                      fontSize: 14,
                     }}
                   >
                     {m.role === "assistant"
@@ -616,6 +558,7 @@ export default function HistoryScreen() {
                       : m.role.charAt(0).toUpperCase() + m.role.slice(1)}
                   </Text>
                 </View>
+
                 <Text
                   style={{
                     color: theme === "dark" ? "#fff" : "#1a242a",
@@ -630,7 +573,7 @@ export default function HistoryScreen() {
             ))}
           </ScrollView>
 
-          {/* Input bar — visible only when a conversation is selected */}
+          {/* Input bar */}
           <View
             style={{
               padding: 12,
@@ -654,7 +597,7 @@ export default function HistoryScreen() {
                 style={{
                   flex: 1,
                   backgroundColor: theme === "dark" ? "#071a12" : "#f6fbf8",
-                  paddingVertical: Platform.OS === "ios" ? 12 : 8,
+                  paddingVertical: 10,
                   paddingHorizontal: 12,
                   borderRadius: 22,
                   fontSize: 15,
@@ -663,7 +606,6 @@ export default function HistoryScreen() {
                 multiline
                 returnKeyType="send"
                 onSubmitEditing={() => {
-                  // iOS: onSubmitEditing may behave differently; ensure non-empty
                   if (inputText.trim()) handleSendMessage();
                 }}
               />
@@ -672,7 +614,6 @@ export default function HistoryScreen() {
                 onPress={handleSendMessage}
                 disabled={sending || inputText.trim().length === 0}
                 style={{
-                  marginLeft: 6,
                   width: 48,
                   height: 48,
                   borderRadius: 24,

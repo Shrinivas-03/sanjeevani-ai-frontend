@@ -1,8 +1,10 @@
 import { API_BASE_URL } from "@/constants/api";
 import { useAuth } from "@/context/auth";
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   Alert,
+  Animated,
+  Easing,
   Image,
   KeyboardAvoidingView,
   Platform,
@@ -26,19 +28,39 @@ export default function SignUpScreen({ onLogin }: { onLogin?: () => void }) {
   const [searchText, setSearchText] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const { login } = useAuth();
-  const styles = getStyles();
   const router = require("expo-router").useRouter();
+  const { login } = useAuth();
 
-  /* ---------------------------------------------
-     VALIDATION FUNCTIONS
-  ----------------------------------------------*/
+  // Animation like SignIn page
+  const cardOpacity = useRef(new Animated.Value(0)).current;
+  const cardTranslateY = useRef(new Animated.Value(30)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(cardOpacity, {
+        toValue: 1,
+        duration: 450,
+        easing: Easing.out(Easing.ease),
+        useNativeDriver: true,
+      }),
+      Animated.timing(cardTranslateY, {
+        toValue: 0,
+        duration: 450,
+        easing: Easing.out(Easing.ease),
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
+
+  /* ------------------------
+     VALIDATION + SIGNUP LOGIC
+  ------------------------- */
 
   const validateName = (name: string) => {
     if (name.trim().length < 3)
       return "Full Name must be at least 3 characters.";
     if (!/^[A-Za-z ]+$/.test(name))
-      return "Full Name should contain only letters and spaces.";
+      return "Full Name should contain only letters.";
     return null;
   };
 
@@ -51,28 +73,17 @@ export default function SignUpScreen({ onLogin }: { onLogin?: () => void }) {
 
   const validatePassword = (password: string) => {
     const errors = [];
-    if (password.length < 8) errors.push("at least 8 characters");
+    if (password.length < 8) errors.push("8 characters");
     if (!/[A-Z]/.test(password)) errors.push("1 uppercase letter");
     if (!/[a-z]/.test(password)) errors.push("1 lowercase letter");
     if (!/[0-9]/.test(password)) errors.push("1 number");
-    if (!/[!@#$%^&*(),.?":{}|<>]/.test(password))
-      errors.push("1 special character");
+    if (!/[!@#$%^&*]/.test(password)) errors.push("1 special char");
 
-    if (errors.length > 0) {
-      return `Password must include: ${errors.join(", ")}`;
-    }
-    return null;
+    return errors.length ? "Password must include: " + errors.join(", ") : null;
   };
 
-  const validateBloodGroup = (bg: string) => {
-    return BLOOD_GROUPS.includes(bg)
-      ? null
-      : "Please select a valid blood group.";
-  };
-
-  /* ---------------------------------------------
-     SIGNUP HANDLER WITH VALIDATION
-  ----------------------------------------------*/
+  const validateBloodGroup = (bg: string) =>
+    BLOOD_GROUPS.includes(bg) ? null : "Select a valid blood group.";
 
   const handleSignUp = async () => {
     const errors = [];
@@ -96,280 +107,342 @@ export default function SignUpScreen({ onLogin }: { onLogin?: () => void }) {
 
     setLoading(true);
     try {
-      const requestData: any = {
+      const payload: any = {
         fullName: fullName.trim(),
         email: email.trim(),
         password: password.trim(),
-        bloodGroup: bloodGroup,
+        bloodGroup,
         ...(diseases ? { existingDiseases: diseases.trim() } : {}),
       };
 
       const response = await fetch(`${API_BASE_URL}/api/auth/signup`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(requestData),
+        body: JSON.stringify(payload),
       });
 
       const data = await response.json();
 
       if (response.ok) {
-        const navigateToOtp = () =>
-          router.push({ pathname: "/otp-verification", params: { email } });
-
-        if (Platform.OS === "web") {
-          navigateToOtp();
-          Alert.alert(
-            "Success",
-            "Account created! Check your email for verification.",
-          );
-        } else {
-          Alert.alert("Success", "Account created! Verify your email.", [
-            { text: "OK", onPress: navigateToOtp },
-          ]);
-        }
+        router.push({ pathname: "/otp-verification", params: { email } });
       } else {
-        Alert.alert("Error", data.message || data.error || "Signup failed");
+        Alert.alert("Error", data.message || "Signup failed");
       }
-    } catch (error) {
+    } catch {
       Alert.alert("Error", "Failed to connect to server.");
     } finally {
       setLoading(false);
     }
   };
 
-  /* ---------------------------------------------
-     UI RENDER
-  ----------------------------------------------*/
+  /* ------------------------
+     UI WITH NEW DESIGN
+  ------------------------- */
+
+  const isDark = true; // SIGNUP uses dark theme by default
+  const styles = getStyles(isDark);
 
   return (
     <KeyboardAvoidingView
       style={styles.root}
       behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
-      <ScrollView
-        contentContainerStyle={{ flexGrow: 1 }}
-        keyboardShouldPersistTaps="handled"
-      >
-        <View style={styles.card}>
-          <View style={styles.brandRow}>
-            <View style={styles.logoCircle}>
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        <View style={styles.centerWrapper}>
+          {/* Glassy animated card */}
+          <Animated.View
+            style={[
+              styles.card,
+              {
+                opacity: cardOpacity,
+                transform: [{ translateY: cardTranslateY }],
+              },
+            ]}
+          >
+            {/* Floating logo */}
+            <View style={styles.logoWrapper}>
               <Image
                 source={require("../assets/images/logo.png")}
                 style={styles.logo}
               />
             </View>
-            <Text style={styles.brandTitle}>Sanjeevani AI</Text>
-          </View>
 
-          <Text style={styles.title}>Create Account</Text>
-          <Text style={styles.subtitle}>
-            Join us to manage your health better.
-          </Text>
+            <Text style={styles.title}>Create an Account</Text>
+            <Text style={styles.subtitle}>
+              Join us to manage your health better.
+            </Text>
 
-          {/* FULL NAME */}
-          <View style={styles.formGroup}>
-            <Text style={styles.label}>Full Name *</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="John Doe"
-              placeholderTextColor="#888"
-              value={fullName}
-              onChangeText={setFullName}
-            />
-          </View>
-
-          {/* EMAIL */}
-          <View style={styles.formGroup}>
-            <Text style={styles.label}>Email Address *</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="you@example.com"
-              placeholderTextColor="#888"
-              autoCapitalize="none"
-              keyboardType="email-address"
-              value={email}
-              onChangeText={setEmail}
-            />
-          </View>
-
-          {/* PASSWORD */}
-          <View style={styles.formGroup}>
-            <Text style={styles.label}>Password *</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Enter a secure password"
-              placeholderTextColor="#888"
-              secureTextEntry
-              value={password}
-              onChangeText={setPassword}
-            />
-          </View>
-
-          {/* BLOOD GROUP */}
-          <View style={styles.formGroup}>
-            <Text style={styles.label}>Blood Group *</Text>
-            <View style={styles.selectWrapper}>
+            {/* FULL NAME */}
+            <View style={styles.group}>
+              <Text style={styles.label}>Full Name *</Text>
               <TextInput
                 style={styles.input}
-                placeholder="Select Blood Group"
-                placeholderTextColor="#888"
-                value={bloodGroup}
-                onFocus={() => setShowDropdown(true)}
-                onChangeText={(text) => {
-                  setSearchText(text);
-                  setBloodGroup(text);
-                  setShowDropdown(true);
-                }}
+                placeholder="John Doe"
+                placeholderTextColor="#6b7280"
+                value={fullName}
+                onChangeText={setFullName}
               />
-              {showDropdown && (
-                <View style={styles.dropdown}>
-                  <ScrollView>
-                    {(searchText
-                      ? BLOOD_GROUPS.filter((bg) =>
-                          bg.toLowerCase().startsWith(searchText.toLowerCase()),
-                        )
-                      : BLOOD_GROUPS
-                    ).map((bg) => (
-                      <TouchableOpacity
-                        key={bg}
-                        onPress={() => {
-                          setBloodGroup(bg);
-                          setSearchText("");
-                          setShowDropdown(false);
-                        }}
-                      >
-                        <Text style={styles.dropdownItem}>{bg}</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </ScrollView>
-                </View>
-              )}
             </View>
-          </View>
 
-          {/* EXISTING DISEASES */}
-          <View style={styles.formGroup}>
-            <Text style={styles.label}>Existing Diseases</Text>
-            <TextInput
-              style={[styles.input, styles.textarea]}
-              placeholder="e.g., Diabetes, Hypertension"
-              placeholderTextColor="#888"
-              multiline
-              value={diseases}
-              onChangeText={setDiseases}
-            />
-          </View>
+            {/* EMAIL */}
+            <View style={styles.group}>
+              <Text style={styles.label}>Email Address *</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="you@example.com"
+                placeholderTextColor="#6b7280"
+                value={email}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                onChangeText={setEmail}
+              />
+            </View>
 
-          {/* SIGNUP BUTTON */}
-          <TouchableOpacity
-            style={[styles.button, loading && { opacity: 0.5 }]}
-            onPress={handleSignUp}
-            disabled={loading}
-          >
-            <Text style={styles.buttonText}>
-              {loading ? "Creating Account..." : "Sign Up"}
-            </Text>
-          </TouchableOpacity>
+            {/* PASSWORD */}
+            <View style={styles.group}>
+              <Text style={styles.label}>Password *</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Enter password"
+                secureTextEntry
+                placeholderTextColor="#6b7280"
+                value={password}
+                onChangeText={setPassword}
+              />
+            </View>
 
-          {/* LOGIN LINK */}
-          <Text style={styles.loginText}>
-            Already have an account?{" "}
-            <Text
-              style={styles.loginLink}
-              onPress={() => router.replace("/signin")}
+            {/* BLOOD GROUP */}
+            <View style={styles.group}>
+              <Text style={styles.label}>Blood Group *</Text>
+
+              <View style={styles.dropdownHolder}>
+                <TextInput
+                  style={styles.input}
+                  value={bloodGroup}
+                  placeholder="Select Blood Group"
+                  placeholderTextColor="#6b7280"
+                  onFocus={() => setShowDropdown(true)}
+                  onChangeText={(t) => {
+                    setSearchText(t);
+                    setBloodGroup(t);
+                    setShowDropdown(true);
+                  }}
+                />
+
+                {showDropdown && (
+                  <View style={styles.dropdown}>
+                    <ScrollView>
+                      {(searchText
+                        ? BLOOD_GROUPS.filter((bg) =>
+                            bg
+                              .toLowerCase()
+                              .startsWith(searchText.toLowerCase()),
+                          )
+                        : BLOOD_GROUPS
+                      ).map((bg) => (
+                        <TouchableOpacity
+                          key={bg}
+                          onPress={() => {
+                            setBloodGroup(bg);
+                            setSearchText("");
+                            setShowDropdown(false);
+                          }}
+                        >
+                          <Text style={styles.dropdownItem}>{bg}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  </View>
+                )}
+              </View>
+            </View>
+
+            {/* EXISTING DISEASES */}
+            <View style={styles.group}>
+              <Text style={styles.label}>Existing Diseases</Text>
+              <TextInput
+                style={[styles.input, styles.textArea]}
+                placeholder="e.g., Diabetes, Hypertension"
+                placeholderTextColor="#6b7280"
+                multiline
+                value={diseases}
+                onChangeText={setDiseases}
+              />
+            </View>
+
+            {/* SIGN UP BUTTON */}
+            <TouchableOpacity
+              style={[styles.buttonPrimary, loading && { opacity: 0.6 }]}
+              onPress={handleSignUp}
+              disabled={loading}
             >
-              Log in
+              <Text style={styles.buttonPrimaryText}>
+                {loading ? "Creating..." : "Sign Up"}
+              </Text>
+            </TouchableOpacity>
+
+            {/* LOGIN LINK */}
+            <Text style={styles.bottomText}>
+              Already have an account?{" "}
+              <Text
+                style={styles.bottomLink}
+                onPress={() => router.replace("/signin")}
+              >
+                Login
+              </Text>
             </Text>
-          </Text>
+          </Animated.View>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
   );
 }
 
-/* ---------------------------------------------
-   STYLES
-----------------------------------------------*/
-function getStyles() {
+/* ------------------------
+  STYLES MATCHING SIGN IN DESIGN
+------------------------- */
+
+function getStyles(isDark: boolean) {
+  const primary = "#22c55e";
+
   return StyleSheet.create({
-    root: { flex: 1, backgroundColor: "#151718", padding: 16 },
-    card: {
-      alignSelf: "center",
-      width: "100%",
-      maxWidth: 360,
-      backgroundColor: "#222",
-      borderRadius: 16,
-      padding: 24,
-      marginTop: "auto",
-      marginBottom: "auto",
+    root: {
+      flex: 1,
+      backgroundColor: isDark ? "#020617" : "#e2f3ea",
     },
-    brandRow: {
-      flexDirection: "row",
+    scrollContent: {
+      flexGrow: 1,
       justifyContent: "center",
-      marginBottom: 12,
+      paddingHorizontal: 20,
+      paddingVertical: 36,
     },
-    logoCircle: {
-      width: 44,
-      height: 44,
-      borderRadius: 22,
-      backgroundColor: "#2ecc40",
+    centerWrapper: {
+      width: "100%",
+      alignItems: "center",
+    },
+
+    logoWrapper: {
+      position: "absolute",
+      top: -45,
+      width: 95,
+      height: 95,
+      borderRadius: 48,
+      backgroundColor: isDark ? "#020617" : "#ecfdf3",
       alignItems: "center",
       justifyContent: "center",
-      marginRight: 10,
+      borderWidth: 2,
+      borderColor: primary,
+      zIndex: 10,
+      overflow: "hidden",
     },
-    logo: { width: 26, height: 26 },
-    brandTitle: { fontSize: 26, fontWeight: "bold", color: "#2ecc40" },
+    logo: { width: "85%", height: "85%" },
+
+    card: {
+      width: "100%",
+      maxWidth: 400,
+      backgroundColor: isDark
+        ? "rgba(15,23,42,0.98)"
+        : "rgba(255,255,255,0.98)",
+      borderRadius: 26,
+      paddingHorizontal: 22,
+      paddingTop: 70,
+      paddingBottom: 24,
+      marginTop: 80,
+      shadowColor: "#000",
+      shadowOpacity: 0.25,
+      shadowRadius: 20,
+      shadowOffset: { width: 0, height: 12 },
+      elevation: 10,
+      borderWidth: 1,
+      borderColor: isDark ? "rgba(148,163,184,0.35)" : "rgba(148,163,184,0.25)",
+    },
+
     title: {
-      fontSize: 28,
-      fontWeight: "bold",
-      color: "#2ecc40",
+      fontSize: 22,
+      fontWeight: "700",
+      color: primary,
       textAlign: "center",
+      marginBottom: 4,
     },
     subtitle: {
-      fontSize: 15,
-      color: "#aaa",
+      fontSize: 13,
       textAlign: "center",
-      marginBottom: 18,
+      color: isDark ? "#9ca3af" : "#6b7280",
+      marginBottom: 20,
     },
-    formGroup: { marginBottom: 14 },
-    label: { fontSize: 15, color: "#eee", marginBottom: 6 },
+
+    group: { marginBottom: 14 },
+
+    label: {
+      fontSize: 13,
+      fontWeight: "600",
+      color: isDark ? "#e2e8f0" : "#111827",
+      marginBottom: 6,
+    },
+
     input: {
-      backgroundColor: "#181a1b",
-      color: "#fff",
-      borderRadius: 8,
-      paddingHorizontal: 12,
-      paddingVertical: Platform.OS === "web" ? 10 : 8,
-      fontSize: 15,
+      backgroundColor: isDark ? "#020617" : "#f4f4f5",
+      borderRadius: 999,
+      paddingHorizontal: 16,
+      paddingVertical: 10,
+      color: isDark ? "#f8fafc" : "#111",
       borderWidth: 1,
-      borderColor: "#333",
+      borderColor: isDark ? "#334155" : "#d1d5db",
+      fontSize: 14,
     },
-    selectWrapper: { position: "relative" },
+
+    textArea: {
+      minHeight: 50,
+      textAlignVertical: "top",
+    },
+
+    dropdownHolder: { position: "relative" },
     dropdown: {
       position: "absolute",
-      top: 40,
-      left: 0,
-      right: 0,
-      backgroundColor: "#222",
-      borderRadius: 8,
+      top: 48,
+      width: "100%",
+      backgroundColor: isDark ? "#1e293b" : "#fff",
+      maxHeight: 140,
+      borderRadius: 16,
       borderWidth: 1,
-      borderColor: "#333",
-      zIndex: 10,
+      borderColor: isDark ? "#334155" : "#ddd",
+      elevation: 6,
+      paddingVertical: 6,
+      zIndex: 20,
     },
-    dropdownItem: { padding: 10, fontSize: 15, color: "#fff" },
-    textarea: { minHeight: 50, textAlignVertical: "top" },
-    button: {
-      backgroundColor: "#2ecc40",
-      borderRadius: 8,
+    dropdownItem: {
+      paddingVertical: 10,
+      paddingHorizontal: 14,
+      fontSize: 14,
+      color: isDark ? "#f1f5f9" : "#111",
+    },
+
+    buttonPrimary: {
+      backgroundColor: primary,
+      borderRadius: 999,
       paddingVertical: 12,
+      alignItems: "center",
       marginTop: 10,
+      shadowColor: primary,
+      shadowOpacity: 0.35,
+      shadowRadius: 14,
+      shadowOffset: { width: 0, height: 8 },
+      elevation: 4,
     },
-    buttonText: {
+    buttonPrimaryText: {
       color: "#fff",
-      textAlign: "center",
-      fontWeight: "bold",
-      fontSize: 17,
+      fontSize: 16,
+      fontWeight: "700",
     },
-    loginText: { textAlign: "center", color: "#aaa", marginTop: 8 },
-    loginLink: { color: "#2ecc40", fontWeight: "bold" },
+
+    bottomText: {
+      marginTop: 12,
+      textAlign: "center",
+      color: isDark ? "#9ca3af" : "#444",
+    },
+    bottomLink: {
+      color: primary,
+      fontWeight: "700",
+    },
   });
 }

@@ -1,284 +1,170 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef } from "react";
 import { Animated, Easing, Image, StyleSheet, Text, View } from "react-native";
 
-type SplashScreenProps = {
-  onFinish: () => void;
-};
+export default function SanjeevaniSplash() {
+  /** LEAF GROW ANIMATION */
+  const leafGrow = useRef(new Animated.Value(0.1)).current;
 
-export default function SplashScreen({ onFinish }: SplashScreenProps) {
-  const [visible, setVisible] = useState(true);
-  const [titleLetters, setTitleLetters] = useState("");
-  const [showTagline, setShowTagline] = useState(false);
-  const logoAnim = useRef(new Animated.Value(0)).current;
-  const flashAnim = useRef(new Animated.Value(0)).current;
-  const taglineAnim = useRef(new Animated.Value(0)).current;
-  const pulseAnim = useRef(new Animated.Value(1)).current;
-  const rotateAnim = useRef(new Animated.Value(0)).current;
-  const backgroundAnim = useRef(new Animated.Value(0)).current;
-  const glowAnim = useRef(new Animated.Value(0)).current;
+  /** RING PULSE */
+  const ringScale = useRef(new Animated.Value(0.8)).current;
+  const ringGlow = useRef(new Animated.Value(0)).current;
+
+  /** TITLE ARC ANIMATION */
+  const titleOpacity = useRef(new Animated.Value(0)).current;
+  const titleTranslate = useRef(new Animated.Value(40)).current;
+
+  /** LOGO FADE-IN */
+  const logoOpacity = useRef(new Animated.Value(0)).current;
+  const logoScale = useRef(new Animated.Value(0.7)).current;
 
   useEffect(() => {
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(backgroundAnim, {
-          toValue: 1,
-          duration: 3000,
-          useNativeDriver: false,
-          easing: Easing.inOut(Easing.sin),
-        }),
-        Animated.timing(backgroundAnim, {
-          toValue: 0,
-          duration: 3000,
-          useNativeDriver: false,
-          easing: Easing.inOut(Easing.sin),
-        }),
-      ]),,
-    ).start();
-
-    // Glow effect animation
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(glowAnim, {
-          toValue: 1,
-          duration: 2000,
-          useNativeDriver: true,
-          easing: Easing.inOut(Easing.sin),
-        }),
-        Animated.timing(glowAnim, {
-          toValue: 0,
-          duration: 2000,
-          useNativeDriver: true,
-          easing: Easing.inOut(Easing.sin),
-        }),
-      ]),,
-    ).start();
-
-    // Logo entrance with enhanced animations
     Animated.sequence([
-      // Initial flash
-      Animated.timing(flashAnim, {
-        toValue: 1,
-        duration: 300,
-        useNativeDriver: true,
-        easing: Easing.linear,
-      }),
-      Animated.timing(flashAnim, {
-        toValue: 0,
-        duration: 200,
-        useNativeDriver: true,
-        easing: Easing.linear,
-      }),
-      // Logo appearance with rotation and scale
+      // Logo fade + scale intro
       Animated.parallel([
-        Animated.timing(logoAnim, {
+        Animated.timing(logoOpacity, {
           toValue: 1,
-          duration: 800,
-          useNativeDriver: true,
-          easing: Easing.out(Easing.back(1.7)),
-        }),
-        Animated.timing(rotateAnim, {
-          toValue: 1,
-          duration: 800,
-          useNativeDriver: true,
+          duration: 1200,
           easing: Easing.out(Easing.exp),
+          useNativeDriver: true,
+        }),
+        Animated.timing(logoScale, {
+          toValue: 1,
+          duration: 1200,
+          easing: Easing.out(Easing.exp),
+          useNativeDriver: true,
         }),
       ]),
-"",    ]).start();
 
-    // Pulse effect after logo appears
-    setTimeout(() => {
+      // Leaf grows upward
+      Animated.timing(leafGrow, {
+        toValue: 1,
+        duration: 1500,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: true,
+      }),
+
+      // Title arc reveal
+      Animated.parallel([
+        Animated.timing(titleOpacity, {
+          toValue: 1,
+          duration: 900,
+          useNativeDriver: true,
+        }),
+        Animated.timing(titleTranslate, {
+          toValue: 0,
+          duration: 900,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+      ]),
+
+      // Ring glowing pulse loop
       Animated.loop(
-        Animated.sequence([
-          Animated.timing(pulseAnim, {
-            toValue: 1.05,
-            duration: 1000,
-            useNativeDriver: true,
+        Animated.parallel([
+          Animated.timing(ringScale, {
+            toValue: 1.1,
+            duration: 1500,
             easing: Easing.inOut(Easing.sin),
+            useNativeDriver: true,
           }),
-          Animated.timing(pulseAnim, {
+          Animated.timing(ringGlow, {
             toValue: 1,
-            duration: 1000,
-            useNativeDriver: true,
-            easing: Easing.inOut(Easing.sin),
+            duration: 1500,
+            useNativeDriver: false,
           }),
         ]),
-      ).start();
-    }, 1000);
+      ),
+    ]).start();
+  }, []);
 
-    // Letter-by-letter animation for title with enhanced timing
-    const title = "Sanjeevani AI";
-    let i = 0;
-    const interval = setInterval(() => {
-      setTitleLetters(title.slice(0, i + 1));
-      i++;
-      if (i === title.length) {
-        clearInterval(interval);
-        setTimeout(() => {
-          setShowTagline(true);
-          Animated.spring(taglineAnim, {
-            toValue: 1,
-            tension: 100,
-            friction: 8,
-            useNativeDriver: true,
-          }).start();
-        }, 400);
-        // Hide splash after all animations with fade out
-        setTimeout(() => {
-          Animated.timing(logoAnim, {
-            toValue: 0,
-            duration: 500,
-            useNativeDriver: true,
-            easing: Easing.in(Easing.exp),
-          }).start(() => {
-            setVisible(false);
-            onFinish();
-          });
-        }, 3000);
-      }
-    }, 4000 / title.length);
-    return () => clearInterval(interval);
-  }, [
-    logoAnim,
-    flashAnim,
-    taglineAnim,
-    pulseAnim,
-    rotateAnim,
-    backgroundAnim,
-    glowAnim,
-    onFinish,
-  ]);
-
-  if (!visible) return null;
+  const ringShadow = ringGlow.interpolate({
+    inputRange: [0, 1],
+    outputRange: [3, 20],
+  });
 
   return (
-    <Animated.View
-      style={[
-        styles.container,
-        {
-          backgroundColor: backgroundAnim.interpolate({
-            inputRange: [0, 1],
-            outputRange: ["#f7fafc", "#e8f4f8"],
-          }),
-        },
-      ]}
-    >
-      {/* Glow effect behind the logo */}
+    <View style={styles.container}>
+      {/* 🔥 Ring Pulse */}
+      <Animated.View
+        style={[
+          styles.ring,
+          {
+            transform: [{ scale: ringScale }],
+            shadowRadius: ringShadow,
+            shadowColor: "#FFD700",
+            shadowOpacity: 0.8,
+          },
+        ]}
+      />
+
+      {/* 🌿 LEAF GROW ANIMATION (Mask) */}
       <Animated.View
         style={{
-          position: "absolute",
-          opacity: glowAnim.interpolate({
-            inputRange: [0, 1],
-            outputRange: [0.3, 0.8],
-          }),
-          transform: [
-            {
-              scale: glowAnim.interpolate({
-                inputRange: [0, 1],
-                outputRange: [1, 1.2],
-              }),
-            },
-          ],
+          overflow: "hidden",
+          transform: [{ scaleY: leafGrow }],
         }}
       >
-        <View style={styles.glowEffect} />
+        <Animated.Image
+          source={require("../assets/sanjeevani_logo.png")}
+          style={[
+            styles.logo,
+            {
+              opacity: logoOpacity,
+              transform: [{ scale: logoScale }],
+            },
+          ]}
+          resizeMode="contain"
+        />
       </Animated.View>
 
+      {/* ✨ ARC TITLE ANIMATION */}
       <Animated.View
-        style={{
-          opacity: logoAnim,
-          transform: [
-            {
-              scale: Animated.multiply(
-                logoAnim.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [0.7, 1],
-                }),
-                pulseAnim,
-              ),
-            },
-            {
-              rotate: rotateAnim.interpolate({
-                inputRange: [0, 1],
-                outputRange: ["0deg", "360deg"],
-              }),
-            },
-          ],
-        }}
+        style={[
+          styles.titleWrapper,
+          {
+            opacity: titleOpacity,
+            transform: [{ translateY: titleTranslate }],
+          },
+        ]}
       >
-        <Animated.View
-          style={{
-            opacity: flashAnim.interpolate({
-              inputRange: [0, 1],
-              outputRange: [1, 0.2],
-            }),
-          }}
-        >
-          <Image
-            source={require("@/assets/images/logo.png")}
-            style={styles.logo}
-            resizeMode="contain"
-          />
-        </Animated.View>
+        <Text style={styles.arcText}>SANJEEVANI AI</Text>
       </Animated.View>
-      <View style={{ marginTop: 32 }}>
-        <Text style={styles.title}>{titleLetters}</Text>
-      </View>
-      {showTagline && (
-        <Animated.View style={{ opacity: taglineAnim, marginTop: 24 }}>
-          <View style={styles.flaskContainer}>
-            {/* Simple flask icon using SVG path or emoji for demo */}
-            <Text style={styles.flaskIcon}>🧪</Text>
-            <Text style={styles.tagline}>
-              A personal HealthCare from Ayurveda
-            </Text>
-          </View>
-        </Animated.View>
-      )}
-    </Animated.View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: "#070A0E",
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#f7fafc",
   },
+
   logo: {
-    width: 200,
-    height: 200,
-    borderRadius: 32,
-    // All shadow and elevation removed for a clear logo
+    width: 330,
+    height: 330,
   },
-  title: {
-    fontSize: 32,
-    fontWeight: "bold",
-    color: "#0a7ea4",
-    textAlign: "center",
-    letterSpacing: 1,
+
+  ring: {
+    position: "absolute",
+    width: 360,
+    height: 360,
+    borderWidth: 3,
+    borderColor: "#FFD700",
+    borderRadius: 200,
   },
-  flaskContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
+
+  titleWrapper: {
+    position: "absolute",
+    top: "20%",
   },
-  flaskIcon: {
+
+  arcText: {
     fontSize: 24,
-    marginRight: 6,
-  },
-  tagline: {
-    fontSize: 16,
-    color: "#687076",
-    textAlign: "center",
-    fontStyle: "italic",
-  },
-  glowEffect: {
-    width: 240,
-    height: 240,
-    borderRadius: 120,
-    backgroundColor: "#0a7ea4",
-    opacity: 0.1,
+    color: "#FFD700",
+    fontWeight: "bold",
+    letterSpacing: 4,
+    transform: [{ rotate: "-8deg" }],
   },
 });

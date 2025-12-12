@@ -1,4 +1,5 @@
 import BrandHeader from "@/components/brand-header";
+import { getAccessToken } from "@/constants/api";
 import { useAuth } from "@/context/auth";
 import { useAppTheme } from "@/context/theme";
 import { router } from "expo-router";
@@ -17,9 +18,6 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { getAccessToken } from "@/constants/api";
-
-const BLOOD_GROUPS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
 
 export default function ProfileScreen() {
   const { theme } = useAppTheme();
@@ -45,22 +43,21 @@ export default function ProfileScreen() {
         },
       );
       const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.error || "Failed to fetch user details");
-      }
+      if (!response.ok) throw new Error(data.error);
+
       setFullName(data.user.full_name);
       setEmail(data.user.email);
       setBloodGroup(data.user.blood_group);
       setDiseases(data.user.existing_diseases);
-    } catch (error) {
-      console.error("Error fetching user details:", error.message);
+    } catch (e: any) {
+      console.error("Fetch error:", e.message);
     }
   };
 
   const updateUserProfile = async () => {
     const token = await getAccessToken();
     try {
-      const response = await fetch(
+      const res = await fetch(
         `${process.env.EXPO_PUBLIC_API_BASE_URL}/api/auth/edit-profile`,
         {
           method: "PUT",
@@ -76,36 +73,27 @@ export default function ProfileScreen() {
           }),
         },
       );
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.error || "Failed to update profile");
-      }
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+
       Alert.alert("Success", "Profile updated successfully");
       setIsEditing(false);
-    } catch (error) {
-      Alert.alert("Error", error.message);
+    } catch (e: any) {
+      Alert.alert("Error", e.message);
     }
   };
 
   useEffect(() => {
     fetchUserDetails();
-    const willShow = Keyboard.addListener("keyboardWillShow", (e) =>
+    const show = Keyboard.addListener("keyboardWillShow", (e) =>
       setKeyboardHeight(e.endCoordinates.height),
     );
-    const willHide = Keyboard.addListener("keyboardWillHide", () =>
-      setKeyboardHeight(0),
-    );
-    const didShow = Keyboard.addListener("keyboardDidShow", (e) =>
-      setKeyboardHeight(e.endCoordinates.height),
-    );
-    const didHide = Keyboard.addListener("keyboardDidHide", () =>
+    const hide = Keyboard.addListener("keyboardWillHide", () =>
       setKeyboardHeight(0),
     );
     return () => {
-      willShow.remove();
-      willHide.remove();
-      didShow.remove();
-      didHide.remove();
+      show.remove();
+      hide.remove();
     };
   }, []);
 
@@ -113,36 +101,30 @@ export default function ProfileScreen() {
 
   return (
     <View style={styles.container}>
-      <BrandHeader subtitle="Your health, your journey" />
+      <BrandHeader subtitle="Manage your account details" />
+
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        keyboardVerticalOffset={0}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
         <ScrollView
           keyboardShouldPersistTaps="handled"
-          contentContainerStyle={{
-            flexGrow: 1,
-            justifyContent: "center",
-            alignItems: "center",
-            paddingBottom: 40 + (Platform.OS === "ios" ? bottomOffset : 0),
-          }}
+          contentContainerStyle={{ paddingBottom: bottomOffset + 40 }}
         >
           <View style={styles.profileCard}>
+            {/* EDIT BUTTON */}
             <TouchableOpacity
+              onPress={() =>
+                isEditing ? updateUserProfile() : setIsEditing(true)
+              }
               style={styles.editButton}
-              onPress={() => {
-                if (isEditing) updateUserProfile();
-                else setIsEditing(true);
-              }}
-              activeOpacity={0.8}
             >
               <Text style={styles.editButtonText}>
                 {isEditing ? "Save" : "Edit"}
               </Text>
             </TouchableOpacity>
 
-            {/* Avatar & Name */}
+            {/* AVATAR */}
             <View style={styles.avatarSection}>
               <Image
                 source={require("../../assets/images/profile-avatar.png")}
@@ -152,78 +134,74 @@ export default function ProfileScreen() {
               <Text style={styles.emailText}>{email}</Text>
             </View>
 
-            {/* Form Section */}
+            {/* FORM */}
             <View style={styles.formSection}>
               <View style={styles.inputBlock}>
                 <Text style={styles.label}>Full Name</Text>
                 <TextInput
-                  style={styles.input}
                   value={fullName}
                   onChangeText={setFullName}
                   editable={isEditing}
-                />
-              </View>
-              <View style={styles.inputBlock}>
-                <Text style={styles.label}>Email Address</Text>
-                <TextInput
                   style={styles.input}
-                  value={email}
-                  onChangeText={setEmail}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  editable={isEditing}
                 />
               </View>
+
+              <View style={styles.inputBlock}>
+                <Text style={styles.label}>Email</Text>
+                <TextInput
+                  value={email}
+                  editable={false}
+                  style={styles.input}
+                />
+              </View>
+
               <View style={styles.inputBlock}>
                 <Text style={styles.label}>Blood Group</Text>
                 <TextInput
-                  style={styles.input}
                   value={bloodGroup}
                   onChangeText={setBloodGroup}
                   editable={isEditing}
+                  style={styles.input}
                 />
               </View>
+
               <View style={styles.inputBlock}>
-                <Text style={styles.label}>Existing Diseases (if any)</Text>
+                <Text style={styles.label}>Existing Diseases</Text>
                 <TextInput
-                  style={[styles.input, styles.textarea]}
                   value={diseases}
                   onChangeText={setDiseases}
-                  multiline
-                  numberOfLines={2}
                   editable={isEditing}
+                  multiline
+                  style={[styles.input, styles.textarea]}
                 />
               </View>
             </View>
 
+            {/* LOGOUT */}
             <TouchableOpacity
               style={styles.logoutButton}
-              onPress={() => {
-                Alert.alert("Log out", "Are you sure you want to log out?", [
+              onPress={() =>
+                Alert.alert("Logout", "Are you sure?", [
                   { text: "Cancel", style: "cancel" },
-                  {
-                    text: "Log out",
-                    style: "destructive",
-                    onPress: () => logout(),
-                  },
-                ]);
-              }}
-              activeOpacity={0.8}
+                  { text: "Logout", style: "destructive", onPress: logout },
+                ])
+              }
             >
               <Text style={styles.logoutButtonText}>Log out</Text>
             </TouchableOpacity>
+
+            {/* LINKS */}
             <View style={styles.linkButtonsRow}>
               <TouchableOpacity
                 style={styles.linkButton}
                 onPress={() => router.push("/about")}
-                activeOpacity={0.8}
               >
                 <Text style={styles.linkButtonText}>About Us</Text>
               </TouchableOpacity>
+
               <TouchableOpacity
                 style={styles.linkButton}
                 onPress={() => router.push("/features")}
-                activeOpacity={0.8}
               >
                 <Text style={styles.linkButtonText}>Features</Text>
               </TouchableOpacity>
@@ -237,143 +215,138 @@ export default function ProfileScreen() {
 
 function getStyles(theme: string) {
   const isDark = theme === "dark";
+
   return StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: isDark ? "#151718" : "#f5f6f7",
-      paddingHorizontal: 0,
+      backgroundColor: isDark ? "#020617" : "#eef9f2",
     },
+
     profileCard: {
-      backgroundColor: isDark ? "#222428" : "#fff",
-      borderRadius: 26,
-      padding: 30,
-      shadowColor: "#2ecc40",
-      shadowOpacity: 0.12,
-      shadowRadius: 20,
-      elevation: 5,
-      margin: 30,
-      maxWidth: 410,
-      alignItems: "center",
-      width: "100%",
+      backgroundColor: isDark ? "#020617" : "#ffffff",
+      width: "92%",
+      borderRadius: 22,
+      alignSelf: "center",
+      paddingVertical: 30,
+      paddingHorizontal: 24,
+      marginTop: 26,
+
+      shadowColor: "#22c55e",
+      shadowOpacity: isDark ? 0.55 : 0.15,
+      shadowRadius: 24,
+      shadowOffset: { width: 0, height: 10 },
+      elevation: 9,
     },
+
     editButton: {
       position: "absolute",
-      top: 18,
+      top: 16,
       right: 18,
-      backgroundColor: "#2ecc40",
-      borderRadius: 8,
+      backgroundColor: "#22c55e",
+      paddingVertical: 7,
       paddingHorizontal: 20,
-      paddingVertical: 8,
-      zIndex: 10,
-      shadowColor: "#000",
-      shadowOpacity: 0.15,
-      shadowRadius: 3,
-      elevation: 3,
+      borderRadius: 999,
     },
     editButtonText: {
       color: "#fff",
-      fontWeight: "bold",
       fontSize: 15,
-      letterSpacing: 0.1,
+      fontWeight: "800",
     },
+
     avatarSection: {
       alignItems: "center",
-      marginTop: 10,
-      marginBottom: 25,
+      marginTop: 20,
+      marginBottom: 26,
     },
+
     avatar: {
-      width: 100,
-      height: 100,
-      borderRadius: 50,
+      width: 110,
+      height: 110,
+      borderRadius: 60,
       borderWidth: 4,
-      borderColor: "#2ecc40",
-      backgroundColor: isDark ? "#181a1b" : "#f5f6f7",
-      marginBottom: 8,
-      shadowColor: "#2ecc40",
-      shadowOpacity: 0.18,
-      shadowRadius: 8,
-      elevation: 2,
+      borderColor: "#22c55e",
+      backgroundColor: isDark ? "#030712" : "#eafcf1",
     },
+
     nameText: {
-      fontSize: 20,
-      fontWeight: "bold",
-      color: isDark ? "#fff" : "#222",
-      marginBottom: 2,
-      letterSpacing: 0.15,
-      textAlign: "center",
+      fontSize: 21,
+      fontWeight: "900",
+      marginTop: 10,
+      color: isDark ? "#ffffff" : "#034525",
     },
+
     emailText: {
+      marginTop: 2,
       fontSize: 14,
-      color: isDark ? "#67d085" : "#058138",
-      marginBottom: 10,
-      textAlign: "center",
+      color: isDark ? "#67e797" : "#099850",
+      opacity: 0.85,
     },
+
     formSection: {
-      width: "100%",
-      marginBottom: 16,
+      marginTop: 10,
+      marginBottom: 18,
     },
+
     inputBlock: {
-      marginBottom: 10,
+      marginBottom: 12,
     },
+
     label: {
-      fontSize: 15,
-      color: isDark ? "#eee" : "#222",
-      marginBottom: 3,
-      fontWeight: "600",
+      fontSize: 14,
+      fontWeight: "700",
+      marginBottom: 4,
+      color: isDark ? "#bbf7d0" : "#0d4d28",
     },
+
     input: {
-      backgroundColor: isDark ? "#181a1b" : "#f5f6f7",
-      color: isDark ? "#fff" : "#222",
-      borderRadius: 9,
-      paddingHorizontal: 13,
-      paddingVertical: 9,
-      fontSize: 16,
-      borderWidth: 1.5,
-      borderColor: isDark ? "#333" : "#dde1e6",
+      backgroundColor: isDark ? "#071013" : "#ecfdf5",
+      borderWidth: 1,
+      borderColor: isDark ? "#1f2937" : "#bbf7d0",
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+      borderRadius: 14,
+      fontSize: 15,
+      color: isDark ? "#fff" : "#033a25",
     },
+
     textarea: {
-      minHeight: 48,
+      minHeight: 55,
       textAlignVertical: "top",
     },
+
     logoutButton: {
-      backgroundColor: isDark ? "#3a3a3a" : "#e95454",
-      borderRadius: 10,
+      backgroundColor: "#fb3f3f",
       paddingVertical: 13,
-      marginTop: 10,
-      marginBottom: 10,
-      alignItems: "center",
-      borderWidth: 2,
-      borderColor: isDark ? "#444" : "#e3bcbc",
+      borderRadius: 999,
       width: "100%",
+      alignItems: "center",
+      marginTop: 18,
+      marginBottom: 14,
     },
     logoutButtonText: {
       color: "#fff",
-      fontWeight: "bold",
       fontSize: 17,
+      fontWeight: "800",
     },
+
     linkButtonsRow: {
       flexDirection: "row",
-      gap: 16,
-      justifyContent: "center",
-      width: "100%",
-      marginTop: 3,
+      gap: 12,
+      marginTop: 2,
     },
+
     linkButton: {
-      backgroundColor: "#2ecc40",
-      borderRadius: 8,
-      paddingVertical: 9,
-      paddingHorizontal: 26,
+      flex: 1,
+      backgroundColor: "#22c55e",
+      paddingVertical: 11,
+      borderRadius: 999,
       alignItems: "center",
-      marginTop: 0,
-      width: "48%",
-      marginBottom: 6,
     },
+
     linkButtonText: {
       color: "#fff",
-      fontWeight: "bold",
+      fontWeight: "800",
       fontSize: 15,
-      letterSpacing: 0.05,
-      textAlign: "center",
     },
   });
 }

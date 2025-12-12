@@ -2,35 +2,76 @@ import React from "react";
 import { View, Text, StyleSheet } from "react-native";
 
 export default function PredictionExplanation({ text, theme }) {
-  if (!text) return null;
+  if (!text || typeof text !== "string") return null;
 
   const styles = getStyles(theme);
-
-  const sections = text.split(/\*\*(.*?)\*\*/g);
+  const sections = parseStrictMarkdownSections(text);
 
   return (
     <View style={styles.wrapper}>
-      {sections.map((part, index) => {
-        if (index % 2 === 1) {
-          return (
-            <Text key={index} style={styles.sectionTitle}>
-              {part.trim()}
+      {sections.map((sec, idx) => (
+        <View key={idx} style={{ marginBottom: 18 }}>
+          <Text style={styles.sectionTitle}>
+            {getEmoji(sec.heading)} {sec.heading}
+          </Text>
+
+          {sec.body.split(/\n+/).map((line, i) => (
+            <Text key={i} style={styles.sectionContent}>
+              {formatBullet(line)}
             </Text>
-          );
-        } else {
-          return part.trim().length > 0 ? (
-            <Text key={index} style={styles.sectionContent}>
-              {formatBulletPoints(part)}
-            </Text>
-          ) : null;
-        }
-      })}
+          ))}
+        </View>
+      ))}
     </View>
   );
 }
 
-function formatBulletPoints(text: string) {
-  return text.replace(/\n\s*\*\s*/g, "\n• ").replace(/\n\s*\d+\.\s*/g, "\n🔸 ");
+/* STRICT MODE PARSER
+   Only matches headers like:
+   ## **Heading Name**
+*/
+function parseStrictMarkdownSections(text: string) {
+  const blocks = text.split(/##\s+\*\*(.*?)\*\*/g);
+  const output: { heading: string; body: string }[] = [];
+
+  for (let i = 1; i < blocks.length; i += 2) {
+    const heading = blocks[i].trim();
+    const body = (blocks[i + 1] || "").trim();
+    output.push({ heading, body });
+  }
+
+  // fallback for text with no strict headers
+  if (output.length === 0) {
+    return [{ heading: "Explanation", body: text.trim() }];
+  }
+
+  return output;
+}
+
+/* Emojis per heading */
+function getEmoji(h: string) {
+  const map: any = {
+    "Why the model predicted this": "🧠",
+    Warnings: "⚠️",
+    "Ayurvedic Remedies": "🌿",
+    "Lifestyle & Exercise": "🏃‍♂️",
+    "Additional Suggestions": "💡",
+  };
+  return map[h] || "➤";
+}
+
+/* Bullet formatter */
+function formatBullet(line: string) {
+  const trimmed = line.trim();
+  if (!trimmed) return "";
+
+  // Bulleted lists
+  if (/^[-•]/.test(trimmed)) return "• " + trimmed.replace(/^[-•]\s*/, "");
+
+  // Numbered lists
+  if (/^\d+\./.test(trimmed)) return "🔸 " + trimmed.replace(/^\d+\.\s*/, "");
+
+  return trimmed;
 }
 
 function getStyles(theme: string) {
@@ -48,17 +89,16 @@ function getStyles(theme: string) {
 
     sectionTitle: {
       fontSize: 18,
-      fontWeight: "700",
+      fontWeight: "800",
       color: isDark ? "#fff" : "#222",
-      marginTop: 16,
-      marginBottom: 6,
+      marginBottom: 8,
     },
 
     sectionContent: {
       fontSize: 15,
       color: isDark ? "#ddd" : "#444",
       lineHeight: 22,
-      marginBottom: 8,
+      marginBottom: 4,
     },
   });
 }

@@ -66,13 +66,7 @@ const ConfidenceBar = ({ percent, theme }: { percent: number; theme: any }) => {
 };
 
 /* CONFIDENCE BADGE */
-const ConfidenceBadge = ({
-  percent,
-  theme,
-}: {
-  percent: number;
-  theme: any;
-}) => {
+const ConfidenceBadge = ({ percent, theme }: any) => {
   const anim = useRef(new Animated.Value(0)).current;
   const [display, setDisplay] = useState(0);
   const isDark = theme === "dark";
@@ -195,11 +189,13 @@ const Accordion = ({ title, children, theme }: any) => {
   );
 };
 
-/* PRETTY EXPLANATION */
+/* -------------------------
+   PREMIUM EXPLANATION RENDERER
+   ------------------------- */
 const PrettyExplanation = ({ text, theme }: any) => {
   const isDark = theme === "dark";
 
-  if (!text) {
+  if (!text || typeof text !== "string") {
     return (
       <Text style={{ color: isDark ? "#aaa" : "#555" }}>
         No explanation provided.
@@ -207,27 +203,69 @@ const PrettyExplanation = ({ text, theme }: any) => {
     );
   }
 
-  const parts = text.replace(/\r/g, "").split(/\n{2,}/);
+  // Split markdown sections: ## **Section Name**
+  const splitSections = text.split(/##\s+\*\*(.*?)\*\*/g);
+
+  const emojiMap: any = {
+    "Why the model predicted this": "🧠",
+    Warnings: "⚠️",
+    "Ayurvedic Remedies": "🌿",
+    "Lifestyle & Exercise": "🏃‍♂️",
+    "Additional Suggestions": "💡",
+  };
+
+  const headerStyle = {
+    fontSize: 17,
+    fontWeight: "900",
+    marginTop: 16,
+    marginBottom: 6,
+    color: isDark ? "#fff" : "#0b3d91",
+  };
+
+  const bulletStyle = {
+    fontSize: 14,
+    color: isDark ? "#ddd" : "#333",
+    marginLeft: 10,
+    marginBottom: 6,
+    lineHeight: 22,
+  };
+
+  const containerStyle = { marginBottom: 12 };
 
   return (
     <View>
-      {parts.map((p: string, idx: number) => (
-        <Text
-          key={idx}
-          style={{
-            color: isDark ? "#ddd" : "#333",
-            lineHeight: 20,
-            marginBottom: 10,
-          }}
-        >
-          {p}
-        </Text>
-      ))}
+      {splitSections.map((block, idx) => {
+        if (idx % 2 === 0) return null; // skip text before first header
+
+        const title = splitSections[idx].trim();
+        const body = splitSections[idx + 1]?.trim() || "";
+
+        const bullets = body
+          .split(/\n|•/g)
+          .map((b) => b.trim())
+          .filter((b) => b.length > 0);
+
+        return (
+          <View key={idx} style={containerStyle}>
+            <Text style={headerStyle}>
+              {emojiMap[title] || "➤"} {title}
+            </Text>
+
+            {bullets.map((item, i) => (
+              <Text key={i} style={bulletStyle}>
+                • {item}
+              </Text>
+            ))}
+          </View>
+        );
+      })}
     </View>
   );
 };
 
-/* INPUT FIELD */
+/* -------------------------
+   INPUT FIELD
+------------------------- */
 function InputField({
   label,
   value,
@@ -238,7 +276,6 @@ function InputField({
   theme,
 }: any) {
   const isDark = theme === "dark";
-
   return (
     <View style={[{ flex: 1 }, containerStyle]}>
       <Text style={[stylesGlobal.label, isDark && { color: "#eee" }]}>
@@ -307,9 +344,7 @@ export default function PredictionScreen() {
   const router = useRouter();
   const { theme } = useAppTheme();
   const styles = getStyles(theme);
-  const insets = useSafeAreaInsets();
 
-  // Form states
   const [name, setName] = useState("");
   const [age, setAge] = useState("");
   const [gender, setGender] = useState("");
@@ -323,65 +358,32 @@ export default function PredictionScreen() {
   const [medicalHistory, setMedicalHistory] = useState("");
   const [symptoms, setSymptoms] = useState("");
 
-  // Prediction + UI
   const [predictionResult, setPredictionResult] = useState<any>(null);
   const [loadingPredict, setLoadingPredict] = useState(false);
   const [showGenderDropdown, setShowGenderDropdown] = useState(false);
 
-  // Feedback
   const [feedbackModalVisible, setFeedbackModalVisible] = useState(false);
   const [feedbackChoice, setFeedbackChoice] = useState<boolean | null>(null);
 
-  // Redirect if not logged in
   useEffect(() => {
     if (!loading && !isAuthenticated) router.replace("/signin");
   }, [loading, isAuthenticated]);
 
-  // Dismiss keyboard when screen unmounts
   useEffect(() => {
-    return () => {
-      Keyboard.dismiss();
-    };
+    return () => Keyboard.dismiss();
   }, []);
 
   const API_URL = process.env.EXPO_PUBLIC_API_BASE_URL;
 
-  /* VALIDATION AND PREDICTION */
+  /* VALIDATION + PREDICT */
   const handlePredict = async () => {
     Keyboard.dismiss();
 
     if (!name || !age || !gender || !symptoms) {
       return Alert.alert(
         "Missing Required Fields",
-        "Please fill in your Name, Age, Gender, and Symptoms.",
+        "Please fill all required fields.",
       );
-    }
-
-    const fieldsToValidate: {
-      [key: string]: { value: string; min: number; max: number };
-    } = {
-      Age: { value: age, min: 1, max: 120 },
-      Height: { value: height, min: 20, max: 280 },
-      Weight: { value: weight, min: 1, max: 150 },
-      "Pulse Rate": { value: pulseRate, min: 30, max: 150 },
-      "BP Systolic": { value: bpSystolic, min: 50, max: 280 },
-      "BP Diastolic": { value: bpDiastolic, min: 30, max: 240 },
-      FBS: { value: fbs, min: 30, max: 600 },
-      PPBS: { value: ppbs, min: 30, max: 600 },
-    };
-
-    for (const fieldName in fieldsToValidate) {
-      const { value, min, max } = fieldsToValidate[fieldName];
-      if (value) {
-        const numValue = parseFloat(value);
-        if (isNaN(numValue) || numValue < min || numValue > max) {
-          Alert.alert(
-            "Invalid Input",
-            `${fieldName} must be a valid number between ${min} and ${max}.`,
-          );
-          return;
-        }
-      }
     }
 
     try {
@@ -394,11 +396,11 @@ export default function PredictionScreen() {
         gender,
         height: height ? Number(height) : undefined,
         weight: weight ? Number(weight) : undefined,
+        pulse_rate: pulseRate ? Number(pulseRate) : undefined,
         BP_systolic: bpSystolic ? Number(bpSystolic) : undefined,
         BP_diastolic: bpDiastolic ? Number(bpDiastolic) : undefined,
         FBS: fbs ? Number(fbs) : undefined,
         PPBS: ppbs ? Number(ppbs) : undefined,
-        pulse_rate: pulseRate ? Number(pulseRate) : undefined,
         medical_history: medicalHistory,
         symptoms,
         email: user?.email ?? "unknown@local",
@@ -411,20 +413,18 @@ export default function PredictionScreen() {
       });
 
       const data = await res.json();
-
-      if (!res.ok) {
-        return Alert.alert("Prediction Failed", data?.error || "Server error");
-      }
+      if (!res.ok)
+        return Alert.alert("Prediction Failed", data?.error || "Server Error");
 
       setPredictionResult(data);
-    } catch (err) {
+    } catch {
       Alert.alert("Network Error", "Could not connect to server.");
     } finally {
       setLoadingPredict(false);
     }
   };
 
-  /* SUBMIT FEEDBACK */
+  /* FEEDBACK SUBMIT */
   const submitFeedback = async () => {
     try {
       await fetch(`${API_URL}/predict/feedback`, {
@@ -451,27 +451,25 @@ export default function PredictionScreen() {
       )
     : 0;
 
-  /* RENDER */
+  /* UI RENDER */
   return (
-    <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
       <View style={styles.container}>
         <BrandHeader subtitle="Get personalized predictions" />
 
         <KeyboardAvoidingView
           style={{ flex: 1 }}
           behavior={Platform.OS === "ios" ? "padding" : "height"}
-          keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
         >
           <ScrollView
             keyboardShouldPersistTaps="handled"
-            keyboardDismissMode="on-drag"
-            showsVerticalScrollIndicator={false}
             contentContainerStyle={{
               paddingHorizontal: 16,
               paddingTop: 16,
               paddingBottom: predictionResult ? 16 : 140,
             }}
           >
+            {/* FORM CARD */}
             <View style={styles.card}>
               <Text style={styles.sectionTitle}>Required Information</Text>
 
@@ -494,6 +492,7 @@ export default function PredictionScreen() {
                   theme={theme}
                 />
 
+                {/* GENDER DROPDOWN */}
                 <View
                   style={[styles.colHalf, { position: "relative", zIndex: 40 }]}
                 >
@@ -505,12 +504,10 @@ export default function PredictionScreen() {
                   >
                     Gender <Text style={stylesGlobal.required}>*</Text>
                   </Text>
+
                   <TouchableOpacity
                     style={styles.dropdown}
-                    onPress={() => {
-                      Keyboard.dismiss();
-                      setShowGenderDropdown(!showGenderDropdown);
-                    }}
+                    onPress={() => setShowGenderDropdown(!showGenderDropdown)}
                   >
                     <Text style={styles.dropdownText}>
                       {gender || "Select Gender"}
@@ -542,16 +539,16 @@ export default function PredictionScreen() {
                 <InputField
                   label="Height (cm)"
                   value={height}
-                  setValue={setHeight}
                   numeric
+                  setValue={setHeight}
                   containerStyle={styles.colHalf}
                   theme={theme}
                 />
                 <InputField
                   label="Weight (kg)"
                   value={weight}
-                  setValue={setWeight}
                   numeric
+                  setValue={setWeight}
                   containerStyle={styles.colHalf}
                   theme={theme}
                 />
@@ -561,16 +558,16 @@ export default function PredictionScreen() {
                 <InputField
                   label="Pulse Rate"
                   value={pulseRate}
-                  setValue={setPulseRate}
                   numeric
+                  setValue={setPulseRate}
                   containerStyle={styles.colHalf}
                   theme={theme}
                 />
                 <InputField
                   label="BP Systolic"
                   value={bpSystolic}
-                  setValue={setBpSystolic}
                   numeric
+                  setValue={setBpSystolic}
                   containerStyle={styles.colHalf}
                   theme={theme}
                 />
@@ -579,24 +576,22 @@ export default function PredictionScreen() {
               <InputField
                 label="BP Diastolic"
                 value={bpDiastolic}
-                setValue={setBpDiastolic}
                 numeric
+                setValue={setBpDiastolic}
                 theme={theme}
               />
-
               <InputField
                 label="FBS (mg/dl)"
                 value={fbs}
-                setValue={setFbs}
                 numeric
+                setValue={setFbs}
                 theme={theme}
               />
-
               <InputField
                 label="PPBS (mg/dl)"
                 value={ppbs}
-                setValue={setPpbs}
                 numeric
+                setValue={setPpbs}
                 theme={theme}
               />
 
@@ -630,6 +625,7 @@ export default function PredictionScreen() {
               </TouchableOpacity>
             </View>
 
+            {/* RESULTS */}
             {predictionResult && (
               <View style={styles.resultBox}>
                 <View
@@ -646,6 +642,33 @@ export default function PredictionScreen() {
                     <Text style={styles.resultSub}>
                       Tap to expand more info
                     </Text>
+
+                    {predictionResult.Validation_Status ===
+                      "suspected_wrong" && (
+                      <Text
+                        style={{
+                          color: "#e67e22",
+                          fontWeight: "700",
+                          marginTop: 10,
+                        }}
+                      >
+                        ⚠ Some symptoms may also match other conditions.
+                        Consider monitoring or consulting a doctor.
+                      </Text>
+                    )}
+
+                    {predictionResult.Validation_Status === "possible" && (
+                      <Text
+                        style={{
+                          color: "#f1c40f",
+                          fontWeight: "700",
+                          marginTop: 10,
+                        }}
+                      >
+                        ⚠ Symptoms overlap with other conditions. This is the
+                        closest match.
+                      </Text>
+                    )}
                   </View>
 
                   <View style={{ alignItems: "center" }}>
@@ -662,38 +685,14 @@ export default function PredictionScreen() {
                   </View>
                 </View>
 
+                {/* Accordion */}
                 <Accordion title="Explanation & Remedies" theme={theme}>
-                  <Text
-                    style={{
-                      fontWeight: "800",
-                      marginBottom: 10,
-                      color: theme === "dark" ? "#fff" : "#111",
-                    }}
-                  >
-                    Why the model predicted this:
-                  </Text>
-
                   <PrettyExplanation
                     text={predictionResult.Explanation}
                     theme={theme}
                   />
 
-                  <Text
-                    style={{
-                      fontWeight: "800",
-                      marginTop: 20,
-                      marginBottom: 10,
-                      color: theme === "dark" ? "#fff" : "#111",
-                    }}
-                  >
-                    Ayurvedic Remedies:
-                  </Text>
-
-                  <PrettyExplanation
-                    text={predictionResult.Explanation}
-                    theme={theme}
-                  />
-
+                  {/* FEEDBACK */}
                   <View
                     style={{ flexDirection: "row", gap: 10, marginTop: 20 }}
                   >
@@ -709,7 +708,6 @@ export default function PredictionScreen() {
                         borderWidth: 1,
                         borderColor: "#2ecc40",
                       }}
-                      activeOpacity={0.7}
                     >
                       <Text style={{ color: "#2ecc40", fontWeight: "700" }}>
                         Correct
@@ -728,7 +726,6 @@ export default function PredictionScreen() {
                         borderWidth: 1,
                         borderColor: "#f39c12",
                       }}
-                      activeOpacity={0.7}
                     >
                       <Text style={{ color: "#f39c12", fontWeight: "700" }}>
                         Not Correct
@@ -741,6 +738,7 @@ export default function PredictionScreen() {
           </ScrollView>
         </KeyboardAvoidingView>
 
+        {/* Feedback Modal */}
         <Modal visible={feedbackModalVisible} transparent animationType="fade">
           <TouchableWithoutFeedback
             onPress={() => setFeedbackModalVisible(false)}
@@ -761,6 +759,7 @@ export default function PredictionScreen() {
                   >
                     Confirm Feedback
                   </Text>
+
                   <Text
                     style={[
                       modalStyles.text,
@@ -848,7 +847,7 @@ const stylesGlobal = StyleSheet.create({
   },
 });
 
-/* THEMATIC STYLES */
+/* THEME BASED STYLES */
 function getStyles(theme: any) {
   const isDark = theme === "dark";
 
@@ -862,10 +861,6 @@ function getStyles(theme: any) {
       padding: 20,
       borderRadius: 16,
       elevation: 4,
-      shadowColor: "#000",
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.1,
-      shadowRadius: 8,
     },
     sectionTitle: {
       fontSize: 18,
@@ -902,11 +897,6 @@ function getStyles(theme: any) {
       borderRadius: 10,
       overflow: "hidden",
       zIndex: 999,
-      elevation: 20,
-      shadowColor: "#000",
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.3,
-      shadowRadius: 8,
     },
     dropdownItem: {
       padding: 12,
@@ -919,11 +909,6 @@ function getStyles(theme: any) {
       borderRadius: 12,
       alignItems: "center",
       marginTop: 12,
-      elevation: 3,
-      shadowColor: "#2ecc40",
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.3,
-      shadowRadius: 4,
     },
     predictButtonText: {
       color: "#fff",
@@ -937,11 +922,6 @@ function getStyles(theme: any) {
       backgroundColor: isDark ? "#0d0d0d" : "#f0f9ff",
       borderWidth: 1,
       borderColor: isDark ? "#222" : "#d7eefc",
-      elevation: 3,
-      shadowColor: "#000",
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.1,
-      shadowRadius: 6,
     },
     resultTitle: {
       fontSize: 16,
@@ -962,7 +942,7 @@ function getStyles(theme: any) {
   });
 }
 
-/* MODAL STYLE */
+/* MODAL STYLES */
 const modalStyles = StyleSheet.create({
   overlay: {
     flex: 1,
@@ -975,10 +955,6 @@ const modalStyles = StyleSheet.create({
     padding: 20,
     borderRadius: 12,
     elevation: 8,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
   },
   title: {
     fontSize: 18,

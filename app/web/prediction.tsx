@@ -1,5 +1,4 @@
 // app/web/prediction.tsx
-// screenshot (provided by user): sandbox:/mnt/data/8c6cac24-3e14-487a-a2d7-680c64544b71.png
 
 import BrandHeader from "@/components/brand-header";
 import { useAppTheme } from "@/context/theme";
@@ -22,10 +21,44 @@ import {
   Modal,
 } from "react-native";
 
-import PredictionExplanation from "@/components/web/prediction-view";
+import PredictionExplanation from "@/components/web/prediction-view"; // external component
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const genderOptions = ["Male", "Female", "Other"];
+
+// strict markdown section parser (MOBILE MATCHED)
+function parseMarkdownSections(mdText: string | undefined) {
+  if (!mdText || typeof mdText !== "string") return [];
+
+  const lines = mdText.replace(/\r/g, "").split("\n");
+
+  const sections: { title: string; body: string }[] = [];
+  let currentTitle = "";
+  let buffer: string[] = [];
+
+  const flush = () => {
+    if (currentTitle.trim()) {
+      sections.push({
+        title: currentTitle.trim(),
+        body: buffer.join("\n").trim(),
+      });
+    }
+    buffer = [];
+  };
+
+  for (const line of lines) {
+    const match = line.match(/^##\s+\*\*(.*?)\*\*/);
+    if (match) {
+      flush();
+      currentTitle = match[1];
+    } else {
+      buffer.push(line);
+    }
+  }
+
+  flush();
+  return sections;
+}
 
 export default function WebPredictionPage() {
   const { theme } = useAppTheme();
@@ -57,33 +90,28 @@ export default function WebPredictionPage() {
   const [feedbackChoice, setFeedbackChoice] = useState<null | boolean>(null);
   const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
 
-  // UI refs for scrollIntoView when focusing
+  // UI refs
+  const scrollRef = useRef<any>(null);
   const medicalRef = useRef<any>(null);
   const symptomsRef = useRef<any>(null);
-  const scrollRef = useRef<any>(null);
-
-  // dropdown wrapper ref (kept for backward compatibility; not used for sheet)
   const genderWrapperRef = useRef<any>(null);
 
-  // Animated values
-  const confAnim = useRef(new Animated.Value(0)).current; // 0..100
+  // Animated confidence
+  const confAnim = useRef(new Animated.Value(0)).current;
   const confBadgeAnim = useRef(new Animated.Value(0)).current;
 
-  // sheet animation value (for slide-up)
-  const sheetAnim = useRef(new Animated.Value(0)).current; // 0..1
+  // Bottom sheet anim
+  const sheetAnim = useRef(new Animated.Value(0)).current;
 
-  // API
   const API_URL =
     process.env.EXPO_PUBLIC_API_BASE_URL || "http://127.0.0.1:5000";
   const PREDICT_ENDPOINT = `${API_URL}/predict`;
   const FEEDBACK_ENDPOINT = `${API_URL}/predict/feedback`;
 
-  // If platform not web, hide this component (preserves app behaviour)
   if (Platform.OS !== "web") return null;
 
-  // utility: animate confidence values (0-100)
   const animateConfidence = (percent: number) => {
-    const p = Math.max(0, Math.min(100, percent));
+    const p = Math.min(100, Math.max(0, percent));
     Animated.timing(confAnim, {
       toValue: p,
       duration: 900,
@@ -98,93 +126,44 @@ export default function WebPredictionPage() {
     }).start();
   };
 
-  // ANIMATE SHEET on open/close
+  // gender sheet animation
   useEffect(() => {
-    if (showGenderDropdown) {
-      sheetAnim.setValue(0);
-      Animated.timing(sheetAnim, {
-        toValue: 1,
-        duration: 260,
-        easing: Easing.out(Easing.quad),
-        useNativeDriver: false,
-      }).start();
-    } else {
-      Animated.timing(sheetAnim, {
-        toValue: 0,
-        duration: 200,
-        easing: Easing.in(Easing.quad),
-        useNativeDriver: false,
-      }).start();
-    }
-  }, [showGenderDropdown, sheetAnim]);
+    Animated.timing(sheetAnim, {
+      toValue: showGenderDropdown ? 1 : 0,
+      duration: showGenderDropdown ? 260 : 200,
+      easing: showGenderDropdown
+        ? Easing.out(Easing.quad)
+        : Easing.in(Easing.quad),
+      useNativeDriver: false,
+    }).start();
+  }, [showGenderDropdown]);
 
-  // parse server response but handle non-json responses gracefully
+  // confidence badge display
+  const [badgeDisplay, setBadgeDisplay] = useState(0);
+  useEffect(() => {
+    const id = confBadgeAnim.addListener(({ value }) => {
+      setBadgeDisplay(Math.round(value));
+    });
+    return () => confBadgeAnim.removeListener(id);
+  }, []);
+  /* ---------------------------------
+     SAFE JSON PARSER
+  ----------------------------------- */
   async function safeParseResponse(res: Response) {
     const ct = res.headers.get("content-type") || "";
-    if (ct.includes("application/json")) {
-      return res.json();
-    }
-    // fallback: try text and parse if possible
+    if (ct.includes("application/json")) return res.json();
+
     const txt = await res.text();
     try {
       return JSON.parse(txt);
     } catch {
-      // return raw text wrapped
       return { __raw_text: txt };
     }
   }
 
-  // parse explanation text into sections
-  // Looks for lines that end with ':' and treat them as headings.
-  // Returns an ordered array of { heading, body }.
-  function parseExplanationSections(rawText: string | undefined) {
-    const out: { heading: string; body: string }[] = [];
-    if (!rawText || !rawText.trim()) return out;
-
-    // Normalize CRLF
-    const text = rawText.replace(/\r/g, "");
-    // Regex to find headings: a line that ends with ':' (allow typical headings)
-    const headingRegex = /^([A-Za-z0-9 \-&'()]{3,80}):\s*$/gm;
-    let match;
-    const indices: { idx: number; heading: string }[] = [];
-
-    // gather heading indices
-    while ((match = headingRegex.exec(text)) !== null) {
-      indices.push({ idx: match.index, heading: match[1].trim() });
-    }
-
-    if (indices.length === 0) {
-      // No explicit headings found.
-      // Heuristic: split by two or more newlines into paragraphs and produce gentle sections
-      const parts = text
-        .split(/\n{2,}/)
-        .map((p) => p.trim())
-        .filter(Boolean);
-      if (parts.length <= 1) {
-        out.push({ heading: "Explanation", body: text.trim() });
-      } else {
-        // create generic numbered headings but preserve original paragraphs
-        parts.forEach((p, i) =>
-          out.push({ heading: `Part ${i + 1}`, body: p }),
-        );
-      }
-      return out;
-    }
-
-    // If headings found, slice text accordingly
-    for (let i = 0; i < indices.length; i++) {
-      const start = indices[i].idx;
-      const heading = indices[i].heading;
-      const bodyStart = text.indexOf("\n", start) + 1; // after heading line
-      const end = i + 1 < indices.length ? indices[i + 1].idx : text.length;
-      const body = text.slice(bodyStart, end).trim();
-      out.push({ heading, body });
-    }
-
-    return out;
-  }
-
-  // submit predict
+  /* ---------------------------------
+     PREDICT HANDLER
+  ----------------------------------- */
   const handlePredict = async () => {
     if (!age || !gender || !symptoms) {
       Alert.alert("Missing fields", "Age, Gender and Symptoms are required.");
@@ -205,7 +184,7 @@ export default function WebPredictionPage() {
       PPBS: Number(ppbs) || 0,
       pulse_rate: Number(pulseRate) || 0,
       medical_history: medicalHistory,
-      symptoms: symptoms,
+      symptoms,
       email: "testuser@sanjeevani.ai",
       conversation_id: null,
     };
@@ -218,60 +197,56 @@ export default function WebPredictionPage() {
       });
 
       const data = await safeParseResponse(res);
+
       if (!res.ok) {
-        // Helpful debug message
-        console.error("Predict failed", data);
-        const errMsg =
-          data?.error ||
-          data?.__raw_text ||
-          "Prediction endpoint returned an error.";
-        Alert.alert("Prediction failed", String(errMsg));
+        console.error("Predict failed:", data);
+        Alert.alert(
+          "Prediction Error",
+          data?.error || data?.__raw_text || "Server Error",
+        );
         return;
       }
 
-      // Normalise fields from backend
+      // Normalize fields
       const normalized = {
-        Predicted_Disease:
-          data?.Predicted_Disease || data?.predicted_disease || "Unknown",
+        Predicted_Disease: data?.Predicted_Disease || "Unknown",
         Confidence:
           typeof data?.Confidence === "number"
             ? data.Confidence
-            : (data?.confidence ?? 0),
-        Explanation: data?.Explanation || data?.explanation || "",
-        feedback_id: data?.feedback_id ?? data?.feedbackId ?? null,
-        rag_metadata: data?.rag_metadata ?? {},
+            : Number(data?.confidence ?? 0),
+        Validation_Status: data?.Validation_Status || "confirmed",
+        Explanation: data?.Explanation || "",
+        feedback_id: data?.feedback_id,
+        rag_metadata: data?.rag_metadata || {},
       };
 
       setPredictionResult(normalized);
 
-      // animate confidence (backend might return 0..1 or 0..100)
+      // Confidence animation
       const rawC = Number(normalized.Confidence ?? 0);
       const percent = rawC <= 1 ? Math.round(rawC * 100) : Math.round(rawC);
       animateConfidence(percent);
 
-      // scroll result into view
+      // Scroll to top
       setTimeout(() => {
-        if (scrollRef.current?.scrollTo) {
+        if (scrollRef.current?.scrollTo)
           scrollRef.current.scrollTo({ y: 0, animated: true });
-        } else {
-          window.scrollTo({ top: 0, behavior: "smooth" });
-        }
+        else window.scrollTo({ top: 0, behavior: "smooth" });
       }, 120);
     } catch (err) {
-      console.error("Prediction network error", err);
-      Alert.alert(
-        "Network error",
-        "Could not reach the prediction server. Check backend or network.",
-      );
+      console.error("Network error:", err);
+      Alert.alert("Network Error", "Could not reach the prediction server.");
     } finally {
       setLoadingPredict(false);
     }
   };
 
-  // submit feedback
+  /* ---------------------------------
+     FEEDBACK HANDLER
+  ----------------------------------- */
   const submitFeedback = async () => {
-    if (!predictionResult || !predictionResult.feedback_id) {
-      Alert.alert("Feedback error", "Missing feedback id; cannot submit.");
+    if (!predictionResult?.feedback_id) {
+      Alert.alert("Error", "Missing feedback ID.");
       setFeedbackModalVisible(false);
       return;
     }
@@ -293,23 +268,14 @@ export default function WebPredictionPage() {
       const data = await safeParseResponse(res);
 
       if (!res.ok) {
-        console.error("Feedback error", data);
-        const errMsg = data?.error || data?.__raw_text || "Server error";
-        Alert.alert("Feedback failed", String(errMsg));
+        console.error("Feedback error:", data);
+        Alert.alert("Feedback Error", data?.error || "Server Error");
       } else {
-        Alert.alert("Thanks!", "Your feedback has been recorded.");
-        // update local UI
-        setPredictionResult((prev: any) => ({
-          ...prev,
-          is_correct: body.is_correct,
-        }));
+        Alert.alert("Thank you!", "Your feedback helps improve the model.");
       }
     } catch (err) {
-      console.error("Feedback network error", err);
-      Alert.alert(
-        "Network error",
-        "Could not reach the feedback endpoint. Check backend or network.",
-      );
+      console.error(err);
+      Alert.alert("Network Error", "Could not send feedback.");
     } finally {
       setFeedbackSubmitting(false);
       setFeedbackModalVisible(false);
@@ -317,137 +283,65 @@ export default function WebPredictionPage() {
     }
   };
 
-  // helper to scroll a ref into view (web)
-  const scrollFieldIntoView = (r: any) => {
-    if (!r || !r.current) return;
-    const node = r.current;
-    if (node && node.scrollIntoView) {
-      node.scrollIntoView({ behavior: "smooth", block: "center" });
-    } else if (node && node.focus) {
-      try {
-        node.focus();
-      } catch {}
-    }
-  };
-
-  // outside click & escape key handling for dropdown (web)
-  // keep this — it's still safe to have for other UI, but the sheet modal handles outside press itself
-  useEffect(() => {
-    if (Platform.OS !== "web") return;
-
-    function onDocClick(e: MouseEvent) {
-      try {
-        const wrapper = genderWrapperRef.current;
-        const target = e.target as Node;
-        if (wrapper && typeof wrapper.contains === "function") {
-          if (!wrapper.contains(target)) {
-            setShowGenderDropdown(false);
-          }
-        }
-      } catch {
-        // ignore
-      }
-    }
-
-    function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") {
-        setShowGenderDropdown(false);
-      }
-    }
-
-    document.addEventListener("click", onDocClick, true);
-    document.addEventListener("keydown", onKeyDown, true);
-    return () => {
-      document.removeEventListener("click", onDocClick, true);
-      document.removeEventListener("keydown", onKeyDown, true);
-    };
-  }, []);
-
-  // derived UI confidence percent for text display
+  /* ---------------------------------
+     CONFIDENCE ANIMATION VALUES
+  ----------------------------------- */
   const displayedPercent = (() => {
     if (!predictionResult) return 0;
-    const c = Number(predictionResult.Confidence ?? 0);
+    const c = Number(predictionResult.Confidence);
     return c <= 1 ? Math.round(c * 100) : Math.round(c);
   })();
 
-  // Animated style helpers
   const barWidth = confAnim.interpolate({
     inputRange: [0, 100],
     outputRange: ["0%", "100%"],
   });
 
-  const badgeValue = confBadgeAnim; // used to render number via listener below
-  const [badgeDisplay, setBadgeDisplay] = useState(0);
-  useEffect(() => {
-    const id = badgeValue.addListener(({ value }) =>
-      setBadgeDisplay(Math.round(value)),
-    );
-    return () => badgeValue.removeListener(id);
-  }, [badgeValue]);
+  /* ---------------------------------
+     STRICT MARKDOWN → SELECT SECTIONS
+  ----------------------------------- */
+  const sections = parseMarkdownSections(predictionResult?.Explanation);
 
-  // parse explanation sections (avoid duplication)
-  const explanationSections = parseExplanationSections(
-    predictionResult?.Explanation,
-  );
-
-  // If parse returned multiple sections, find common headings we want to show
-  // We'll attempt to map: "Why the model predicted" and "Ayurvedic Home Remedies & Lifestyle"
-  const getSectionByHeading = (candidates: string[]) => {
-    if (!explanationSections || explanationSections.length === 0) return null;
-    const lowCandidates = candidates.map((s) => s.toLowerCase());
-    for (const sec of explanationSections) {
-      const h = sec.heading.toLowerCase();
-      for (const cand of lowCandidates) {
-        if (h.includes(cand)) return sec.body;
-      }
+  const findSection = (keywords: string[]) => {
+    if (!sections.length) return null;
+    const keys = keywords.map((k) => k.toLowerCase());
+    for (const sec of sections) {
+      const t = sec.title.toLowerCase();
+      if (keys.some((k) => t.includes(k))) return sec.body;
     }
     return null;
   };
 
-  // get the two main bodies if present
   const whyBody =
-    getSectionByHeading([
-      "why the model predicted",
-      "why the model",
-      "why predicted",
-    ]) || (explanationSections.length > 0 ? explanationSections[0].body : null);
+    findSection(["why the model predicted", "why", "reason"]) ||
+    sections[0]?.body ||
+    "";
 
   const remediesBody =
-    getSectionByHeading([
-      "ayurvedic",
-      "remedies",
-      "home remedies",
-      "lifestyle",
-    ]) ||
-    // pick second section if different from first
-    (explanationSections.length > 1 ? explanationSections[1].body : null);
+    findSection(["ayurvedic", "remedies", "lifestyle"]) ||
+    sections[1]?.body ||
+    "";
 
-  // If both are equal, only show once
-  const showRemedies =
-    remediesBody &&
-    remediesBody.trim() &&
-    remediesBody.trim() !== (whyBody || "").trim();
-
-  // sheet translate interpolation (0..1 => translateY)
-  const sheetTranslateY = sheetAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [420, 0], // slide up distance (tweak if needed)
-  });
-
-  // UI
+  const warningsBody = findSection(["warning", "overlap"]);
+  const lifestyleBody = findSection(["lifestyle"]);
+  const additionalBody = findSection(["additional", "suggestions"]);
+  /* ---------------------------------
+     UI RENDER
+  ----------------------------------- */
   return (
     <View style={styles.container}>
       <BrandHeader subtitle="Get personalized predictions" />
 
       <KeyboardAvoidingView behavior="height" style={{ flex: 1 }}>
         <ScrollView
-          ref={scrollRef as any}
+          ref={scrollRef}
           contentContainerStyle={[
             styles.scrollContent,
             { paddingBottom: Platform.OS === "web" ? 24 : insets.bottom + 16 },
           ]}
           keyboardShouldPersistTaps="handled"
         >
+          {/* --- FORM CARD --- */}
           <View style={styles.card}>
             <Text style={styles.sectionTitle}>Required Information</Text>
 
@@ -477,10 +371,9 @@ export default function WebPredictionPage() {
                 />
               </View>
 
-              {/* GENDER: open bottom-sheet modal on press */}
               <View
                 style={[styles.colHalf, { position: "relative" }]}
-                ref={genderWrapperRef as any}
+                ref={genderWrapperRef}
               >
                 <Text style={styles.label}>
                   Gender <Text style={styles.required}>*</Text>
@@ -581,24 +474,22 @@ export default function WebPredictionPage() {
 
             <Text style={styles.sectionTitle}>Medical History</Text>
             <TextInput
-              ref={medicalRef as any}
+              ref={medicalRef}
               style={[styles.input, styles.textarea]}
               value={medicalHistory}
               onChangeText={setMedicalHistory}
               multiline
               numberOfLines={3}
-              onFocus={() => scrollFieldIntoView(medicalRef)}
             />
 
             <Text style={styles.sectionTitle}>Symptoms</Text>
             <TextInput
-              ref={symptomsRef as any}
+              ref={symptomsRef}
               style={[styles.input, styles.textarea]}
               value={symptoms}
               onChangeText={setSymptoms}
               multiline
               numberOfLines={3}
-              onFocus={() => scrollFieldIntoView(symptomsRef)}
             />
 
             <TouchableOpacity
@@ -613,22 +504,53 @@ export default function WebPredictionPage() {
               )}
             </TouchableOpacity>
 
-            {/* Result */}
+            {/* -------------------- RESULT CARD -------------------- */}
             {predictionResult && (
               <View style={styles.resultBox}>
                 <View style={styles.resultRow}>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.resultTitle}>Prediction Result</Text>
+
                     <Text style={styles.resultLine}>
-                      <Text style={styles.bold}>Disease:</Text>{" "}
+                      <Text style={styles.bold}>Condition:</Text>{" "}
                       {predictionResult.Predicted_Disease}
                     </Text>
+
+                    {/* 🔶 Soft Indirect Warnings */}
+                    {predictionResult.Validation_Status ===
+                      "suspected_wrong" && (
+                      <Text
+                        style={{
+                          marginTop: 8,
+                          color: "#e67e22",
+                          fontWeight: "700",
+                        }}
+                      >
+                        ⚠ Some of your symptoms may also relate to other common
+                        conditions.
+                      </Text>
+                    )}
+
+                    {predictionResult.Validation_Status === "possible" && (
+                      <Text
+                        style={{
+                          marginTop: 8,
+                          color: "#f1c40f",
+                          fontWeight: "700",
+                        }}
+                      >
+                        ⚠ Your symptoms can sometimes overlap with other
+                        conditions.
+                      </Text>
+                    )}
+
                     <Text style={styles.resultLine}>
                       <Text style={styles.bold}>Confidence:</Text>{" "}
                       {displayedPercent}%
                     </Text>
                   </View>
 
+                  {/* Confidence Badge */}
                   <View style={styles.confidenceCol}>
                     <View style={styles.badge}>
                       <Text style={styles.badgePercent}>{badgeDisplay}%</Text>
@@ -636,12 +558,7 @@ export default function WebPredictionPage() {
                     </View>
 
                     <View style={{ width: 180, marginTop: 12 }}>
-                      <View
-                        style={[
-                          styles.confBarBackground,
-                          { backgroundColor: "#e6f0ff" },
-                        ]}
-                      >
+                      <View style={styles.confBarBackground}>
                         <Animated.View
                           style={[
                             styles.confBarFill,
@@ -661,58 +578,71 @@ export default function WebPredictionPage() {
                   </View>
                 </View>
 
-                <View style={{ height: 12 }} />
+                {/* ---------------- EXPLANATION SECTIONS ---------------- */}
+
                 <View style={styles.explanationSection}>
                   {/* WHY */}
                   <Text style={styles.explainHeader}>
-                    Why the model predicted
+                    Why the model predicted this
                   </Text>
-                  {whyBody ? (
-                    <PredictionExplanation text={whyBody} theme={theme} />
-                  ) : (
-                    <PredictionExplanation
-                      text={predictionResult.Explanation}
-                      theme={theme}
-                    />
-                  )}
+                  <PredictionExplanation text={whyBody} theme={theme} />
 
-                  {/* REMEDIES (only if different) */}
-                  {showRemedies && (
+                  {/* WARNINGS */}
+                  {warningsBody && warningsBody.trim().length > 0 && (
                     <>
-                      <View style={{ height: 10 }} />
-                      <Text style={styles.explainHeader}>
-                        Ayurvedic Home Remedies & Lifestyle
-                      </Text>
+                      <Text style={styles.explainHeader}>Warnings</Text>
                       <PredictionExplanation
-                        text={remediesBody!}
+                        text={warningsBody}
                         theme={theme}
                       />
                     </>
                   )}
 
-                  {/* If there were additional parsed sections beyond why/remedies, render them */}
-                  {explanationSections.length > 2 && (
+                  {/* REMEDIES */}
+                  {remediesBody && remediesBody.trim().length > 0 && (
                     <>
-                      <View style={{ height: 10 }} />
-                      {explanationSections.slice(2).map((s, idx) => (
-                        <View key={idx} style={{ marginTop: 10 }}>
-                          <Text
-                            style={[styles.explainHeader, { fontSize: 16 }]}
-                          >
-                            {s.heading}
-                          </Text>
-                          <PredictionExplanation text={s.body} theme={theme} />
-                        </View>
-                      ))}
+                      <Text style={styles.explainHeader}>
+                        Ayurvedic Remedies
+                      </Text>
+                      <PredictionExplanation
+                        text={remediesBody}
+                        theme={theme}
+                      />
                     </>
                   )}
 
-                  {/* Feedback buttons */}
+                  {/* LIFESTYLE */}
+                  {lifestyleBody && lifestyleBody.trim().length > 0 && (
+                    <>
+                      <Text style={styles.explainHeader}>
+                        Lifestyle & Exercise
+                      </Text>
+                      <PredictionExplanation
+                        text={lifestyleBody}
+                        theme={theme}
+                      />
+                    </>
+                  )}
+
+                  {/* ADDITIONAL */}
+                  {additionalBody && additionalBody.trim().length > 0 && (
+                    <>
+                      <Text style={styles.explainHeader}>
+                        Additional Suggestions
+                      </Text>
+                      <PredictionExplanation
+                        text={additionalBody}
+                        theme={theme}
+                      />
+                    </>
+                  )}
+
+                  {/* FEEDBACK BUTTONS */}
                   <View
                     style={{
                       flexDirection: "row",
                       justifyContent: "flex-end",
-                      marginTop: 14,
+                      marginTop: 16,
                     }}
                   >
                     <TouchableOpacity
@@ -735,10 +665,7 @@ export default function WebPredictionPage() {
                         setFeedbackChoice(false);
                         setFeedbackModalVisible(true);
                       }}
-                      style={[
-                        styles.smallBtn,
-                        { borderColor: "#f39c12", backgroundColor: "#fff" },
-                      ]}
+                      style={[styles.smallBtn, { borderColor: "#f39c12" }]}
                     >
                       <Text style={{ color: "#f39c12", fontWeight: "700" }}>
                         Not correct
@@ -751,21 +678,22 @@ export default function WebPredictionPage() {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
-
-      {/* Gender Bottom Sheet Modal (Option A2) */}
+      {/* --------------------------------------------
+          GENDER BOTTOM SHEET MODAL
+      --------------------------------------------- */}
       <Modal
         visible={showGenderDropdown}
         transparent
         animationType="none"
         onRequestClose={() => setShowGenderDropdown(false)}
       >
-        {/* Dimmed overlay (press to close) */}
+        {/* Overlay */}
         <Pressable
           style={styles.sheetOverlay}
           onPress={() => setShowGenderDropdown(false)}
         />
 
-        {/* Animated sheet */}
+        {/* Sheet */}
         <Animated.View
           style={[
             styles.sheetContainer,
@@ -789,7 +717,7 @@ export default function WebPredictionPage() {
           ))}
 
           <TouchableOpacity
-            style={[styles.sheetCancel]}
+            style={styles.sheetCancel}
             onPress={() => setShowGenderDropdown(false)}
           >
             <Text style={styles.sheetCancelText}>Cancel</Text>
@@ -797,7 +725,9 @@ export default function WebPredictionPage() {
         </Animated.View>
       </Modal>
 
-      {/* Feedback modal */}
+      {/* --------------------------------------------
+          FEEDBACK MODAL
+      --------------------------------------------- */}
       <Modal
         visible={feedbackModalVisible}
         transparent
@@ -821,23 +751,25 @@ export default function WebPredictionPage() {
                 ? "Confirm — Mark as correct"
                 : "Confirm — Mark as not correct"}
             </Text>
+
             <Text
               style={[
                 modalStyles.text,
                 theme === "dark" ? { color: "#ddd" } : {},
               ]}
             >
-              Are you sure you want to submit this feedback? It will help
-              improve model performance.
+              Are you sure you want to submit this feedback? It helps improve
+              future predictions.
             </Text>
 
             <View
               style={{
                 flexDirection: "row",
                 justifyContent: "flex-end",
-                marginTop: 18,
+                marginTop: 20,
               }}
             >
+              {/* Cancel */}
               <Pressable
                 onPress={() => {
                   setFeedbackModalVisible(false);
@@ -857,6 +789,7 @@ export default function WebPredictionPage() {
                 <Text style={{ color: "#333", fontWeight: "700" }}>Cancel</Text>
               </Pressable>
 
+              {/* Confirm */}
               <Pressable
                 onPress={submitFeedback}
                 style={({ pressed }) => [
@@ -880,10 +813,9 @@ export default function WebPredictionPage() {
     </View>
   );
 }
-
-/* ---------------------------
-   STYLES
-   --------------------------- */
+/* --------------------------------------------
+   STYLES (MAIN)
+--------------------------------------------- */
 function getStyles(theme: string) {
   const isDark = theme === "dark";
 
@@ -914,7 +846,6 @@ function getStyles(theme: string) {
       fontWeight: "bold",
       color: isDark ? "#fff" : "#222",
       marginBottom: 10,
-      marginTop: 2,
     },
     label: {
       fontSize: 15,
@@ -928,8 +859,8 @@ function getStyles(theme: string) {
     row: {
       flexDirection: "row",
       gap: 12,
-      marginBottom: 12,
       width: "100%",
+      marginBottom: 12,
     },
     colFull: {
       flex: 1,
@@ -945,9 +876,9 @@ function getStyles(theme: string) {
       borderRadius: 8,
       paddingHorizontal: 12,
       paddingVertical: 10,
-      fontSize: 15,
       borderWidth: 1,
       borderColor: isDark ? "#333" : "#ddd",
+      fontSize: 15,
     },
     dropdown: {
       backgroundColor: isDark ? "#181a1b" : "#f5f6f7",
@@ -956,70 +887,60 @@ function getStyles(theme: string) {
       borderColor: isDark ? "#333" : "#ddd",
       paddingHorizontal: 12,
       paddingVertical: 10,
-      justifyContent: "center",
     },
     dropdownText: {
       color: isDark ? "#fff" : "#222",
       fontSize: 15,
     },
 
-    /* --- Bottom sheet styles --- */
+    /* Bottom sheet */
     sheetOverlay: {
       position: "absolute",
       top: 0,
       left: 0,
       right: 0,
       bottom: 0,
-      backgroundColor: "rgba(6,10,20,0.45)",
+      backgroundColor: "rgba(0,0,0,0.4)",
     },
     sheetContainer: {
       position: "absolute",
+      bottom: 0,
       left: 0,
       right: 0,
-      bottom: 0,
       backgroundColor: isDark ? "#111" : "#fff",
       borderTopLeftRadius: 16,
       borderTopRightRadius: 16,
-      paddingTop: 12,
-      paddingBottom: 24,
+      paddingVertical: 20,
       paddingHorizontal: 16,
-      maxHeight: 420,
-      elevation: 20,
-      shadowColor: "#000",
-      shadowOpacity: 0.18,
-      shadowRadius: 18,
     },
     sheetHandle: {
       width: 40,
       height: 5,
       borderRadius: 4,
-      backgroundColor: isDark ? "#333" : "#ddd",
+      backgroundColor: isDark ? "#333" : "#ccc",
       alignSelf: "center",
       marginBottom: 12,
     },
     sheetTitle: {
+      textAlign: "center",
       fontSize: 16,
       fontWeight: "700",
+      marginBottom: 10,
       color: isDark ? "#fff" : "#111",
-      marginBottom: 8,
-      textAlign: "center",
     },
     sheetItem: {
       paddingVertical: 14,
-      paddingHorizontal: 8,
       borderBottomWidth: 1,
-      borderBottomColor: isDark ? "#222" : "#f0f0f0",
+      borderBottomColor: isDark ? "#222" : "#eee",
     },
     sheetItemText: {
-      fontSize: 16,
-      color: isDark ? "#fff" : "#111",
       textAlign: "center",
+      fontSize: 16,
       fontWeight: "600",
+      color: isDark ? "#fff" : "#111",
     },
     sheetCancel: {
       marginTop: 10,
-      paddingVertical: 12,
-      borderRadius: 10,
       alignItems: "center",
     },
     sheetCancelText: {
@@ -1027,48 +948,7 @@ function getStyles(theme: string) {
       fontWeight: "700",
     },
 
-    dropdownList: {
-      position: "absolute",
-      top: 54, // placed below the dropdown button; tweak if you change padding
-      left: 0,
-      right: 0,
-      backgroundColor: isDark ? "#222" : "#fff",
-      borderRadius: 8,
-      borderWidth: 1,
-      borderColor: isDark ? "#333" : "#ddd",
-      zIndex: 9999, // ensure it appears above other content
-      elevation: 10,
-      maxHeight: 220,
-      // react-native-web: use overflow for scrolling when content is long
-      ...(Platform.OS === "web" ? ({ overflow: "auto" } as any) : {}),
-      shadowColor: "#000",
-      shadowOpacity: 0.1,
-      shadowRadius: 8,
-    },
-    dropdownItem: {
-      paddingVertical: 10,
-      paddingHorizontal: 12,
-    },
-
-    textarea: {
-      minHeight: 80,
-      textAlignVertical: "top",
-      marginBottom: 8,
-    },
-    predictButton: {
-      backgroundColor: "#2ecc40",
-      borderRadius: 8,
-      paddingVertical: 14,
-      marginTop: 16,
-      marginBottom: 8,
-      alignItems: "center",
-      justifyContent: "center",
-    },
-    predictButtonText: {
-      color: "#fff",
-      fontWeight: "bold",
-      fontSize: 18,
-    },
+    /* Result Box */
     resultBox: {
       marginTop: 20,
       backgroundColor: isDark ? "#111" : "#f0f8ff",
@@ -1091,30 +971,25 @@ function getStyles(theme: string) {
     },
     bold: { fontWeight: "bold" },
 
-    // confidence column
+    /* Confidence */
     resultRow: {
       flexDirection: "row",
       alignItems: "flex-start",
       justifyContent: "space-between",
       gap: 12,
-      width: "100%",
     },
     confidenceCol: {
       alignItems: "center",
-      marginLeft: 12,
     },
     badge: {
       width: 84,
       height: 84,
-      borderRadius: 44,
+      borderRadius: 42,
       backgroundColor: isDark ? "#0b0b0b" : "#fff",
       borderWidth: 1,
       borderColor: isDark ? "#333" : "#e6eefc",
       alignItems: "center",
       justifyContent: "center",
-      shadowColor: "#000",
-      shadowOpacity: 0.08,
-      shadowRadius: 8,
     },
     badgePercent: {
       fontSize: 20,
@@ -1123,41 +998,40 @@ function getStyles(theme: string) {
     },
     badgeLabel: {
       fontSize: 11,
-      color: isDark ? "#9aa" : "#666",
+      color: isDark ? "#aaa" : "#666",
     },
     confBarBackground: {
       height: 12,
       borderRadius: 12,
-      overflow: "hidden",
       backgroundColor: "#e6f0ff",
+      overflow: "hidden",
     },
     confBarFill: {
       height: "100%",
-      width: "0%",
     },
+
     explanationSection: {
-      marginTop: 8,
+      marginTop: 16,
     },
     explainHeader: {
       fontWeight: "800",
+      fontSize: 17,
       marginBottom: 8,
       color: isDark ? "#fff" : "#111",
     },
+
     smallBtn: {
       paddingVertical: 8,
       paddingHorizontal: 12,
       borderRadius: 8,
       borderWidth: 1,
-      backgroundColor: "transparent",
     },
   });
 }
-
-// modal styles
 const modalStyles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: "rgba(6,10,20,0.6)",
+    backgroundColor: "rgba(0,0,0,0.55)",
     alignItems: "center",
     justifyContent: "center",
     padding: 20,
@@ -1168,7 +1042,6 @@ const modalStyles = StyleSheet.create({
     backgroundColor: "#fff",
     borderRadius: 12,
     padding: 18,
-    elevation: 8,
   },
   title: {
     fontSize: 16,
@@ -1176,10 +1049,13 @@ const modalStyles = StyleSheet.create({
     marginBottom: 8,
     color: "#111",
   },
-  text: { fontSize: 14, color: "#444" },
+  text: {
+    fontSize: 14,
+    color: "#444",
+  },
   btn: {
     paddingVertical: 10,
-    paddingHorizontal: 14,
+    paddingHorizontal: 16,
     borderRadius: 8,
   },
 });

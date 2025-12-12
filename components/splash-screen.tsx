@@ -1,170 +1,237 @@
-import React, { useEffect, useRef } from "react";
-import { Animated, Easing, Image, StyleSheet, Text, View } from "react-native";
+import React, { useEffect, useRef } from 'react';
+import {
+  Animated,
+  Easing,
+  Image,
+  PanResponder,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 
-export default function SanjeevaniSplash() {
-  /** LEAF GROW ANIMATION */
-  const leafGrow = useRef(new Animated.Value(0.1)).current;
+type SplashScreenProps = {
+  onFinish: () => void;
+};
 
-  /** RING PULSE */
-  const ringScale = useRef(new Animated.Value(0.8)).current;
-  const ringGlow = useRef(new Animated.Value(0)).current;
+export default function SplashScreen({ onFinish }: SplashScreenProps) {
+  const splashOpacityAnim = useRef(new Animated.Value(1)).current;
+  const glowAnim = useRef(new Animated.Value(0)).current;
 
-  /** TITLE ARC ANIMATION */
-  const titleOpacity = useRef(new Animated.Value(0)).current;
-  const titleTranslate = useRef(new Animated.Value(40)).current;
+  const titleOpacityAnim = useRef(new Animated.Value(0)).current;
+  const titleTranslateAnim = useRef(new Animated.Value(40)).current;
 
-  /** LOGO FADE-IN */
-  const logoOpacity = useRef(new Animated.Value(0)).current;
-  const logoScale = useRef(new Animated.Value(0.7)).current;
+  const panResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, gesture) =>
+        Math.abs(gesture.dx) > 15 || Math.abs(gesture.dy) > 15,
+      onPanResponderRelease: (_, gesture) => {
+        if (Math.abs(gesture.dx) > 40 || Math.abs(gesture.dy) > 40) {
+          Animated.timing(splashOpacityAnim, {
+            toValue: 0,
+            duration: 600,
+            useNativeDriver: true,
+            easing: Easing.linear,
+          }).start(() => {
+            onFinish();
+          });
+        }
+      },
+    })
+  ).current;
 
   useEffect(() => {
-    Animated.sequence([
-      // Logo fade + scale intro
-      Animated.parallel([
-        Animated.timing(logoOpacity, {
+    // Pulsing glow animation
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(glowAnim, {
           toValue: 1,
-          duration: 1200,
-          easing: Easing.out(Easing.exp),
+          duration: 2000,
           useNativeDriver: true,
+          easing: Easing.inOut(Easing.quad),
         }),
-        Animated.timing(logoScale, {
-          toValue: 1,
-          duration: 1200,
-          easing: Easing.out(Easing.exp),
-          useNativeDriver: true,
-        }),
-      ]),
-
-      // Leaf grows upward
-      Animated.timing(leafGrow, {
-        toValue: 1,
-        duration: 1500,
-        easing: Easing.out(Easing.quad),
-        useNativeDriver: true,
-      }),
-
-      // Title arc reveal
-      Animated.parallel([
-        Animated.timing(titleOpacity, {
-          toValue: 1,
-          duration: 900,
-          useNativeDriver: true,
-        }),
-        Animated.timing(titleTranslate, {
+        Animated.timing(glowAnim, {
           toValue: 0,
-          duration: 900,
-          easing: Easing.out(Easing.cubic),
+          duration: 2000,
           useNativeDriver: true,
+          easing: Easing.inOut(Easing.quad),
         }),
-      ]),
+      ])
+    ).start();
 
-      // Ring glowing pulse loop
-      Animated.loop(
-        Animated.parallel([
-          Animated.timing(ringScale, {
-            toValue: 1.1,
-            duration: 1500,
-            easing: Easing.inOut(Easing.sin),
-            useNativeDriver: true,
-          }),
-          Animated.timing(ringGlow, {
-            toValue: 1,
-            duration: 1500,
-            useNativeDriver: false,
-          }),
-        ]),
-      ),
-    ]).start();
+    // Whip-style title animation
+    setTimeout(() => {
+      Animated.parallel([
+        Animated.timing(titleOpacityAnim, {
+          toValue: 1,
+          duration: 700,
+          useNativeDriver: true,
+          easing: Easing.out(Easing.quad),
+        }),
+        Animated.timing(titleTranslateAnim, {
+          toValue: 0,
+          duration: 700,
+          useNativeDriver: true,
+          easing: Easing.out(Easing.back(1.5)),
+        }),
+      ]).start();
+    }, 600);
   }, []);
 
-  const ringShadow = ringGlow.interpolate({
-    inputRange: [0, 1],
-    outputRange: [3, 20],
-  });
-
   return (
-    <View style={styles.container}>
-      {/* 🔥 Ring Pulse */}
-      <Animated.View
-        style={[
-          styles.ring,
-          {
-            transform: [{ scale: ringScale }],
-            shadowRadius: ringShadow,
-            shadowColor: "#FFD700",
-            shadowOpacity: 0.8,
-          },
-        ]}
-      />
+    <Animated.View
+      style={[styles.container, { opacity: splashOpacityAnim }]}
+      {...panResponder.panHandlers}
+    >
+      <View style={styles.content}>
+        {/* Mixed 2-color glow + logo */}
+        <View style={styles.logoGlowContainer}>
+          {/* Outer greenish glow */}
+          <Animated.View
+            style={[
+              styles.glowCircleOuter,
+              {
+                opacity: glowAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0.08, 0.25],
+                }),
+                transform: [
+                  {
+                    scale: glowAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [1, 1.15],
+                    }),
+                  },
+                ],
+              },
+            ]}
+          />
 
-      {/* 🌿 LEAF GROW ANIMATION (Mask) */}
-      <Animated.View
-        style={{
-          overflow: "hidden",
-          transform: [{ scaleY: leafGrow }],
-        }}
-      >
-        <Animated.Image
-          source={require("../assets/sanjeevani_logo.png")}
+          {/* Inner golden glow */}
+          <Animated.View
+            style={[
+              styles.glowCircleInner,
+              {
+                opacity: glowAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0.15, 0.4],
+                }),
+                transform: [
+                  {
+                    scale: glowAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [1, 1.1],
+                    }),
+                  },
+                ],
+              },
+            ]}
+          />
+
+          {/* Pure logo (no white border) */}
+          <View style={styles.logoWrapper}>
+            <Image
+              source={require('@/assets/images/logo.png')}
+              style={styles.logo}
+              resizeMode="cover"
+            />
+          </View>
+        </View>
+
+        {/* Title with whip animation */}
+        <Animated.View
           style={[
-            styles.logo,
+            styles.titleWrapper,
             {
-              opacity: logoOpacity,
-              transform: [{ scale: logoScale }],
+              opacity: titleOpacityAnim,
+              transform: [{ translateY: titleTranslateAnim }],
             },
           ]}
-          resizeMode="contain"
-        />
-      </Animated.View>
+        >
+          <Text style={styles.title}>SANJEEVANI AI</Text>
+        </Animated.View>
 
-      {/* ✨ ARC TITLE ANIMATION */}
-      <Animated.View
-        style={[
-          styles.titleWrapper,
-          {
-            opacity: titleOpacity,
-            transform: [{ translateY: titleTranslate }],
-          },
-        ]}
-      >
-        <Text style={styles.arcText}>SANJEEVANI AI</Text>
-      </Animated.View>
-    </View>
+        {/* Tagline */}
+        <View style={styles.taglineWrapper}>
+          <Text style={styles.tagline}>
+            Your Personal Ayurveda Health Companion
+          </Text>
+        </View>
+      </View>
+    </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#070A0E",
-    justifyContent: "center",
-    alignItems: "center",
+    backgroundColor: '#0f172a',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  content: {
+    alignItems: 'center',
+    zIndex: 10,
+  },
+
+  logoGlowContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  // 🔻 Reduced radius + 2-color mixed glow
+  glowCircleOuter: {
+    position: 'absolute',
+    width: 250,         // reduced from 290
+    height: 250,
+    borderRadius: 125,
+    backgroundColor: '#22c55e', // herbal green glow
+  },
+  glowCircleInner: {
+    position: 'absolute',
+    width: 220,         // smaller, closer to logo
+    height: 220,
+    borderRadius: 110,
+    backgroundColor: '#fbbf24', // golden glow
+  },
+
+  logoWrapper: {
+    width: 230,
+    height: 230,
+    borderRadius: 115,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'transparent',
+    elevation: 10,
   },
 
   logo: {
-    width: 330,
-    height: 330,
-  },
-
-  ring: {
-    position: "absolute",
-    width: 360,
-    height: 360,
-    borderWidth: 3,
-    borderColor: "#FFD700",
-    borderRadius: 200,
+    width: 210,
+    height: 210,
+    borderRadius: 105,
   },
 
   titleWrapper: {
-    position: "absolute",
-    top: "20%",
+    marginTop: 32,
   },
 
-  arcText: {
-    fontSize: 24,
-    color: "#FFD700",
-    fontWeight: "bold",
-    letterSpacing: 4,
-    transform: [{ rotate: "-8deg" }],
+  title: {
+    fontSize: 30,
+    fontWeight: '900',
+    color: '#fbbf24',
+    letterSpacing: 3,
+    textAlign: 'center',
+  },
+
+  taglineWrapper: {
+    marginTop: 10,
+    paddingHorizontal: 20,
+  },
+
+  tagline: {
+    fontSize: 14,
+    color: '#e5e7eb',
+    textAlign: 'center',
   },
 });
+

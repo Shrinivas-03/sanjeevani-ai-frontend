@@ -17,10 +17,16 @@ export const API_ENDPOINTS = {
 };
 
 type ListConvosRes = {
-  conversations: { conversation_id: string; preview: string }[];
+  conversations?: { conversation_id: string; preview: string }[];
+  data?: {
+    conversations: { conversation_id: string; preview: string }[];
+  };
 };
 type GetConvoRes = {
-  messages: { role: "user" | "assistant" | "system"; message: string }[];
+  messages?: { role: "user" | "assistant" | "system"; message: string }[];
+  data?: {
+    messages: { role: "user" | "assistant" | "system"; message: string }[];
+  };
 };
 type SendMsgRes = {
   conversation_id: string;

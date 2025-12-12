@@ -6,6 +6,7 @@ import { useRouter } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Animated,
   Easing,
   Keyboard,
@@ -20,9 +21,7 @@ import {
   TouchableOpacity,
   TouchableWithoutFeedback,
   View,
-  Alert,
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 /* UTIL */
 const clamp = (v: number, a = 0, b = 100) => Math.max(a, Math.min(b, v));
@@ -55,7 +54,7 @@ const ConfidenceBar = ({ percent, theme }: { percent: number; theme: any }) => {
         height: 12,
         borderRadius: 12,
         overflow: "hidden",
-        backgroundColor: isDark ? "#222" : "#e6f0ff",
+        backgroundColor: isDark ? "#0b1f16" : "#eef9f2",
       }}
     >
       <Animated.View
@@ -89,9 +88,9 @@ const ConfidenceBadge = ({ percent, theme }: any) => {
         width: 76,
         height: 76,
         borderRadius: 40,
-        backgroundColor: isDark ? "#0b0b0b" : "#fff",
+        backgroundColor: isDark ? "#1a1d1c" : "rgba(255,255,255,0.72)",
         borderWidth: 1,
-        borderColor: isDark ? "#444" : "#e6eefc",
+        borderColor: isDark ? "#213329" : "rgba(216,243,223,0.7)",
         justifyContent: "center",
         alignItems: "center",
       }}
@@ -100,12 +99,12 @@ const ConfidenceBadge = ({ percent, theme }: any) => {
         style={{
           fontWeight: "900",
           fontSize: 18,
-          color: isDark ? "#fff" : "#111",
+          color: isDark ? "#e7ffe9" : "#0a4225",
         }}
       >
         {display}%
       </Text>
-      <Text style={{ fontSize: 10, color: isDark ? "#aaa" : "#555" }}>
+      <Text style={{ fontSize: 10, color: isDark ? "#9EBCA0" : "#4F8F63" }}>
         confidence
       </Text>
     </View>
@@ -134,11 +133,11 @@ const Accordion = ({ title, children, theme }: any) => {
         onPress={toggle}
         activeOpacity={0.9}
         style={{
-          backgroundColor: isDark ? "#111" : "#eef6ff",
+          backgroundColor: isDark ? "#1a1d1c" : "#f0f5f1",
           padding: 12,
           borderRadius: 12,
           borderWidth: 1,
-          borderColor: isDark ? "#333" : "#cfe6ff",
+          borderColor: isDark ? "#213329" : "#d8f3df",
         }}
       >
         <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
@@ -146,12 +145,12 @@ const Accordion = ({ title, children, theme }: any) => {
             style={{
               fontWeight: "700",
               fontSize: 15,
-              color: isDark ? "#fff" : "#0b3d91",
+              color: isDark ? "#e7ffe9" : "#0b3d91",
             }}
           >
             {title}
           </Text>
-          <Text style={{ color: isDark ? "#aaa" : "#333" }}>
+          <Text style={{ color: isDark ? "#9EBCA0" : "#333" }}>
             {open ? "▲" : "▼"}
           </Text>
         </View>
@@ -173,12 +172,12 @@ const Accordion = ({ title, children, theme }: any) => {
         >
           <View
             style={{
-              backgroundColor: isDark ? "#181a1b" : "#fff",
+              backgroundColor: isDark ? "#1a1d1c" : "#f0f5f1",
               padding: 12,
               marginTop: 10,
               borderRadius: 10,
               borderWidth: 1,
-              borderColor: isDark ? "#333" : "#dce7f7",
+              borderColor: isDark ? "#213329" : "#dce7f7",
             }}
           >
             {children}
@@ -197,7 +196,7 @@ const PrettyExplanation = ({ text, theme }: any) => {
 
   if (!text || typeof text !== "string") {
     return (
-      <Text style={{ color: isDark ? "#aaa" : "#555" }}>
+      <Text style={{ color: isDark ? "#9EBCA0" : "#555" }}>
         No explanation provided.
       </Text>
     );
@@ -216,10 +215,10 @@ const PrettyExplanation = ({ text, theme }: any) => {
 
   const headerStyle = {
     fontSize: 17,
-    fontWeight: "900",
+    fontWeight: "900" as const,
     marginTop: 16,
     marginBottom: 6,
-    color: isDark ? "#fff" : "#0b3d91",
+    color: isDark ? "#e7ffe9" : "#0b3d91",
   };
 
   const bulletStyle = {
@@ -278,7 +277,7 @@ function InputField({
   const isDark = theme === "dark";
   return (
     <View style={[{ flex: 1 }, containerStyle]}>
-      <Text style={[stylesGlobal.label, isDark && { color: "#eee" }]}>
+      <Text style={[stylesGlobal.label, isDark && { color: "#fff7e7ff" }]}>
         {label} {required && <Text style={stylesGlobal.required}>*</Text>}
       </Text>
       <TextInput
@@ -290,9 +289,9 @@ function InputField({
         style={[
           stylesGlobal.input,
           isDark && {
-            backgroundColor: "#181a1b",
-            borderColor: "#333",
-            color: "#fff",
+            backgroundColor: "#2b2a2a92",
+            borderColor: "#189cc140",
+            color: "#fbf8f2ff",
           },
         ]}
       />
@@ -313,7 +312,7 @@ function SectionTextarea({
 
   return (
     <View style={{ marginBottom: 14 }}>
-      <Text style={[stylesGlobal.label, isDark && { color: "#eee" }]}>
+      <Text style={[stylesGlobal.label, isDark && { color: "#e7ffe9" }]}>
         {label} {required && <Text style={stylesGlobal.required}>*</Text>}
       </Text>
       <TextInput
@@ -328,9 +327,9 @@ function SectionTextarea({
         style={[
           stylesGlobal.textarea,
           isDark && {
-            backgroundColor: "#181a1b",
-            borderColor: "#333",
-            color: "#fff",
+            backgroundColor: "#363434d2",
+            borderColor: "#1c89e15d",
+            color: "#e7ffe9",
           },
         ]}
       />
@@ -382,7 +381,7 @@ export default function PredictionScreen() {
     if (!name || !age || !gender || !symptoms) {
       return Alert.alert(
         "Missing Required Fields",
-        "Please fill all required fields.",
+        "Please fill all required fields."
       );
     }
 
@@ -447,7 +446,7 @@ export default function PredictionScreen() {
     ? Math.round(
         Number(predictionResult.Confidence) <= 1
           ? Number(predictionResult.Confidence) * 100
-          : Number(predictionResult.Confidence),
+          : Number(predictionResult.Confidence)
       )
     : 0;
 
@@ -474,7 +473,7 @@ export default function PredictionScreen() {
               <Text style={styles.sectionTitle}>Required Information</Text>
 
               <InputField
-                label="Name"
+                label="Name:"
                 required
                 value={name}
                 setValue={setName}
@@ -483,7 +482,7 @@ export default function PredictionScreen() {
 
               <View style={styles.row}>
                 <InputField
-                  label="Age"
+                  label="Age:"
                   required
                   numeric
                   value={age}
@@ -499,10 +498,10 @@ export default function PredictionScreen() {
                   <Text
                     style={[
                       stylesGlobal.label,
-                      theme === "dark" && { color: "#eee" },
+                      theme === "dark" && { color: "#e7ffe9" },
                     ]}
                   >
-                    Gender <Text style={stylesGlobal.required}>*</Text>
+                    Gender : <Text style={stylesGlobal.required}>*</Text>
                   </Text>
 
                   <TouchableOpacity
@@ -537,7 +536,7 @@ export default function PredictionScreen() {
 
               <View style={styles.row}>
                 <InputField
-                  label="Height (cm)"
+                  label="Height(cm):"
                   value={height}
                   numeric
                   setValue={setHeight}
@@ -545,7 +544,7 @@ export default function PredictionScreen() {
                   theme={theme}
                 />
                 <InputField
-                  label="Weight (kg)"
+                  label="Weight(kg):"
                   value={weight}
                   numeric
                   setValue={setWeight}
@@ -556,7 +555,7 @@ export default function PredictionScreen() {
 
               <View style={styles.row}>
                 <InputField
-                  label="Pulse Rate"
+                  label="Pulse Rate:"
                   value={pulseRate}
                   numeric
                   setValue={setPulseRate}
@@ -564,7 +563,7 @@ export default function PredictionScreen() {
                   theme={theme}
                 />
                 <InputField
-                  label="BP Systolic"
+                  label="BP Systolic:"
                   value={bpSystolic}
                   numeric
                   setValue={setBpSystolic}
@@ -574,21 +573,21 @@ export default function PredictionScreen() {
               </View>
 
               <InputField
-                label="BP Diastolic"
+                label="BP Diastolic:"
                 value={bpDiastolic}
                 numeric
                 setValue={setBpDiastolic}
                 theme={theme}
               />
               <InputField
-                label="FBS (mg/dl)"
+                label="FBS (mg/dl):"
                 value={fbs}
                 numeric
                 setValue={setFbs}
                 theme={theme}
               />
               <InputField
-                label="PPBS (mg/dl)"
+                label="PPBS (mg/dl):"
                 value={ppbs}
                 numeric
                 setValue={setPpbs}
@@ -596,14 +595,14 @@ export default function PredictionScreen() {
               />
 
               <SectionTextarea
-                label="Medical History"
+                label="Medical History:"
                 value={medicalHistory}
                 setValue={setMedicalHistory}
                 placeholder="Describe any past conditions..."
                 theme={theme}
               />
               <SectionTextarea
-                label="Symptoms"
+                label="Symptoms:"
                 required
                 value={symptoms}
                 setValue={setSymptoms}
@@ -639,12 +638,9 @@ export default function PredictionScreen() {
                     <Text style={styles.resultDisease}>
                       {predictionResult.Predicted_Disease}
                     </Text>
-                    <Text style={styles.resultSub}>
-                      Tap to expand more info
-                    </Text>
+                    <Text style={styles.resultSub}>Tap to expand more info</Text>
 
-                    {predictionResult.Validation_Status ===
-                      "suspected_wrong" && (
+                    {predictionResult.Validation_Status === "suspected_wrong" && (
                       <Text
                         style={{
                           color: "#e67e22",
@@ -672,15 +668,9 @@ export default function PredictionScreen() {
                   </View>
 
                   <View style={{ alignItems: "center" }}>
-                    <ConfidenceBadge
-                      percent={confidencePercent}
-                      theme={theme}
-                    />
+                    <ConfidenceBadge percent={confidencePercent} theme={theme} />
                     <View style={{ width: 140, marginTop: 8 }}>
-                      <ConfidenceBar
-                        percent={confidencePercent}
-                        theme={theme}
-                      />
+                      <ConfidenceBar percent={confidencePercent} theme={theme} />
                     </View>
                   </View>
                 </View>
@@ -693,9 +683,7 @@ export default function PredictionScreen() {
                   />
 
                   {/* FEEDBACK */}
-                  <View
-                    style={{ flexDirection: "row", gap: 10, marginTop: 20 }}
-                  >
+                  <View style={{ flexDirection: "row", gap: 10, marginTop: 20 }}>
                     <TouchableOpacity
                       onPress={() => {
                         setFeedbackChoice(true);
@@ -761,10 +749,7 @@ export default function PredictionScreen() {
                   </Text>
 
                   <Text
-                    style={[
-                      modalStyles.text,
-                      theme === "dark" && { color: "#ddd" },
-                    ]}
+                    style={[modalStyles.text, theme === "dark" && { color: "#ddd" }]}
                   >
                     Are you sure you want to mark this as{" "}
                     {feedbackChoice ? "Correct" : "Not Correct"}?
@@ -818,7 +803,7 @@ const stylesGlobal = StyleSheet.create({
   label: {
     fontSize: 15,
     marginBottom: 6,
-    color: "#222",
+    color: "#2a3d31", // dark green tone for labels
     fontWeight: "600",
   },
   required: {
@@ -830,20 +815,22 @@ const stylesGlobal = StyleSheet.create({
     borderRadius: 8,
     paddingVertical: 10,
     paddingHorizontal: 12,
-    backgroundColor: "#f5f6f7",
-    borderColor: "#ccc",
+    backgroundColor: "#f0f5f1",
+    borderColor: "#d8f3df",
     marginBottom: 8,
     fontSize: 15,
+    color: "#0a4225",
   },
   textarea: {
     borderWidth: 1,
     borderRadius: 8,
     padding: 12,
     minHeight: 80,
-    borderColor: "#ccc",
-    backgroundColor: "#f5f6f7",
+    borderColor: "#d8f3df",
+    backgroundColor: "#f0f5f1",
     fontSize: 15,
     textAlignVertical: "top",
+    color: "#0a4225",
   },
 });
 
@@ -851,21 +838,32 @@ const stylesGlobal = StyleSheet.create({
 function getStyles(theme: any) {
   const isDark = theme === "dark";
 
+  // translucent backgrounds for card/result with subtle borders
+  const cardBg = isDark ? "rgba(26,29,28,0.42)" : "rgba(255,255,255,0.72)";
+  const resultBg = isDark ? "rgba(13,26,21,0.36)" : "rgba(240,249,255,0.72)";
+
   return StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: isDark ? "#0f0f10" : "#f5f6f7",
+      backgroundColor: isDark ? "#020617" : "#eef9f2",
     },
     card: {
-      backgroundColor: isDark ? "#121212" : "#fff",
+      backgroundColor: cardBg,
       padding: 20,
       borderRadius: 16,
       elevation: 4,
+      borderWidth: 1,
+      borderColor: isDark ? "rgba(33,51,41,0.6)" : "rgba(216,243,223,0.7)",
+      // subtle overlay shadow for depth
+      shadowColor: "#000",
+      shadowOpacity: isDark ? 0.28 : 0.06,
+      shadowRadius: 10,
+      shadowOffset: { width: 0, height: 6 },
     },
     sectionTitle: {
       fontSize: 18,
       fontWeight: "700",
-      color: isDark ? "#fff" : "#0b3d91",
+      color: isDark ? "#e7ffe9" : "#0b3d91",
       marginBottom: 12,
       marginTop: 8,
     },
@@ -879,21 +877,21 @@ function getStyles(theme: any) {
       borderWidth: 1,
       borderRadius: 8,
       padding: 12,
-      backgroundColor: isDark ? "#181a1b" : "#f5f6f7",
-      borderColor: isDark ? "#333" : "#ccc",
+      backgroundColor: isDark ? "rgba(18,18,18,0.6)" : "rgba(240,245,241,0.85)",
+      borderColor: isDark ? "rgba(33,51,41,0.6)" : "rgba(216,243,223,0.7)",
     },
     dropdownText: {
       fontSize: 15,
-      color: isDark ? "#fff" : "#222",
+      color: isDark ? "#e7ffe9" : "#0a4225",
     },
     dropdownList: {
       position: "absolute",
       top: 52,
       left: 0,
       right: 0,
-      backgroundColor: isDark ? "#181a1b" : "#fff",
+      backgroundColor: isDark ? "#121212" : "#fff",
       borderWidth: 1,
-      borderColor: isDark ? "#444" : "#ccc",
+      borderColor: isDark ? "#213329" : "#d8f3df",
       borderRadius: 10,
       overflow: "hidden",
       zIndex: 999,
@@ -901,14 +899,19 @@ function getStyles(theme: any) {
     dropdownItem: {
       padding: 12,
       borderBottomWidth: 1,
-      borderBottomColor: isDark ? "#333" : "#f0f0f0",
+      borderBottomColor: isDark ? "#213329" : "#f0f0f0",
     },
     predictButton: {
-      backgroundColor: "#2ecc40",
+      backgroundColor: "#22c55e",
       paddingVertical: 14,
       borderRadius: 12,
       alignItems: "center",
       marginTop: 12,
+      shadowColor: "#22c55e",
+      shadowOpacity: 0.12,
+      shadowRadius: 10,
+      shadowOffset: { width: 0, height: 6 },
+      elevation: 3,
     },
     predictButtonText: {
       color: "#fff",
@@ -919,25 +922,30 @@ function getStyles(theme: any) {
       marginTop: 16,
       padding: 18,
       borderRadius: 14,
-      backgroundColor: isDark ? "#0d0d0d" : "#f0f9ff",
+      backgroundColor: resultBg,
       borderWidth: 1,
-      borderColor: isDark ? "#222" : "#d7eefc",
+      borderColor: isDark ? "rgba(33,51,41,0.5)" : "rgba(215,238,252,0.7)",
+      // subtle shadow
+      shadowColor: "#000",
+      shadowOpacity: isDark ? 0.18 : 0.04,
+      shadowRadius: 8,
+      shadowOffset: { width: 0, height: 6 },
     },
     resultTitle: {
       fontSize: 16,
       fontWeight: "700",
-      color: isDark ? "#fff" : "#0b3d91",
+      color: isDark ? "#e7ffe9" : "#0b3d91",
     },
     resultDisease: {
       fontSize: 20,
       fontWeight: "900",
-      color: isDark ? "#fff" : "#0b3d91",
+      color: isDark ? "#e7ffe9" : "#0b3d91",
       marginTop: 4,
       marginBottom: 4,
     },
     resultSub: {
       fontSize: 12,
-      color: isDark ? "#aaa" : "#666",
+      color: isDark ? "#9EBCA0" : "#666",
     },
   });
 }

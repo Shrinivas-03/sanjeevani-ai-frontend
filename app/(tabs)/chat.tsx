@@ -1,23 +1,23 @@
+import BrandHeader from "@/components/brand-header";
+import { sendMessage } from "@/constants/api";
+import { useAuth } from "@/context/auth";
+import { useAppTheme } from "@/context/theme";
 import React, { useEffect, useRef, useState } from "react";
 import {
+  Animated,
   Image,
   KeyboardAvoidingView,
   Platform,
+  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
-  Animated,
-  SafeAreaView,
 } from "react-native";
-import { useAppTheme } from "@/context/theme";
-import { useAuth } from "@/context/auth";
-import BrandHeader from "@/components/brand-header";
-import { sendMessage } from "@/constants/api";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+const watermarkLogo = require("../../assets/images/logo.png");
 const assistantAvatar = require("../../assets/images/icon.png");
 const userAvatar = require("../../assets/images/logo.png");
 
@@ -26,20 +26,16 @@ type Msg = { id: string; sender: "user" | "assistant"; text: string };
 export default function WebChatPage() {
   const { theme } = useAppTheme();
   const { user } = useAuth();
-  const insets = useSafeAreaInsets();
   const styles = getStyles(theme);
 
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [conversationId, setConversationId] = useState<string | undefined>();
-  const scrollRef = useRef<ScrollView | null>(null);
-
-  // -----------------------------
-  // Typing / Thinking Animation
-  // -----------------------------
+  const scrollViewRef = useRef<ScrollView | null>(null);
   const dotAnim = useRef(new Animated.Value(0)).current;
 
+  // Thinking animation
   useEffect(() => {
     if (loading) {
       Animated.loop(
@@ -60,156 +56,160 @@ export default function WebChatPage() {
     return () => dotAnim.stopAnimation();
   }, [loading]);
 
-  // Auto-scroll
+  // Auto scroll
   useEffect(() => {
-    scrollRef.current?.scrollToEnd({ animated: true });
+    scrollViewRef.current?.scrollToEnd({ animated: true });
   }, [messages]);
 
   // -----------------------------
-  // Send Message
+  // Core conversation logic (kept identical behavior)
   // -----------------------------
   const handleSend = async () => {
     if (!input.trim() || loading || !user?.email) return;
 
-    const userText = input.trim();
+    const text = input.trim();
 
+    // Add user's message to UI
     setMessages((prev) => [
       ...prev,
-      { id: Date.now().toString(), sender: "user", text: userText },
+      { id: `${Date.now()}`, sender: "user", text },
     ]);
 
     setInput("");
     setLoading(true);
 
     try {
-      const data = await sendMessage(user.email, userText, conversationId);
+      // API call (unchanged)
+      const data = await sendMessage(user.email, text, conversationId);
+
+      // persist conversation id returned by API
       setConversationId(data.conversation_id);
 
-      const assistantReply = data.response || "No response.";
+      const reply = data.response ?? "No response available";
 
+      // Add assistant reply to UI
+      setMessages((prev) => [
+        ...prev,
+        { id: `${Date.now()}_assistant`, sender: "assistant", text: reply },
+      ]);
+    } catch (err) {
+      // preserve same error behavior (UI message)
       setMessages((prev) => [
         ...prev,
         {
-          id: Date.now().toString() + "-a",
+          id: `${Date.now()}_err`,
           sender: "assistant",
-          text: assistantReply,
+          text: "Sorry, I could not process that.",
         },
       ]);
-    } catch (e) {
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: Date.now().toString() + "-e",
-          sender: "assistant",
-          text: "Something went wrong.",
-        },
-      ]);
+      console.error("sendMessage error:", err);
     } finally {
       setLoading(false);
     }
   };
 
-  // -----------------------------
-  // Render Messages
-  // -----------------------------
-  const renderMessages = () => (
-    <ScrollView
-      ref={scrollRef}
-      contentContainerStyle={styles.messagesContainer}
-      keyboardShouldPersistTaps="handled"
-      showsVerticalScrollIndicator={false}
-    >
-      {/* Placeholder */}
-      {messages.length === 0 && (
-        <View style={{ marginTop: 40, alignItems: "center" }}>
-          <Text style={styles.placeholder}>Start a conversation...</Text>
-        </View>
-      )}
-
-      {/* Chat Messages */}
-      {messages.map((msg) => (
-        <View
-          key={msg.id}
-          style={[
-            styles.row,
-            msg.sender === "assistant" ? styles.rowLeft : styles.rowRight,
-          ]}
-        >
-          {msg.sender === "assistant" && (
-            <Image source={assistantAvatar} style={styles.avatar} />
-          )}
-
-          <View
-            style={[
-              styles.bubble,
-              msg.sender === "assistant"
-                ? styles.assistantBubble
-                : styles.userBubble,
-            ]}
-          >
-            <Text
-              style={
-                msg.sender === "assistant"
-                  ? styles.assistantText
-                  : styles.userText
-              }
-            >
-              {msg.text}
-            </Text>
-          </View>
-
-          {msg.sender === "user" && (
-            <Image source={userAvatar} style={styles.avatar} />
-          )}
-        </View>
-      ))}
-
-      {/* Typing Animation */}
-      {loading && (
-        <View style={[styles.row, styles.rowLeft]}>
-          <Image source={assistantAvatar} style={styles.avatar} />
-          <View style={[styles.bubble, styles.assistantBubble]}>
-            <Animated.Text style={styles.assistantText}>
-              {"Thinking" + ".".repeat(dotAnim.__getValue() % 4)}
-            </Animated.Text>
-          </View>
-        </View>
-      )}
-    </ScrollView>
-  );
-
   return (
-    <SafeAreaView style={styles.page}>
+    <SafeAreaView style={styles.wrapper}>
       <BrandHeader />
-
       <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        keyboardVerticalOffset={Platform.OS === "ios" ? insets.top + 60 : 0}
+        style={styles.kav}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 80 : 0}
       >
-        <View style={styles.chatWrapper}>{renderMessages()}</View>
+        <View style={styles.chatContainer}>
+          {/* Transparent logo watermark */}
+          <Image source={watermarkLogo} style={styles.chatLogoBg} />
 
-        <View style={[styles.inputWrapper, { paddingBottom: insets.bottom }]}>
-          <View style={styles.inputBar}>
-            <TextInput
-              value={input}
-              onChangeText={setInput}
-              placeholder="Type your message..."
-              placeholderTextColor={isDark(theme) ? "#A5C8A6" : "#4F8F63"}
-              style={styles.input}
-              onSubmitEditing={handleSend}
-            />
+          {/* Messages area */}
+          <ScrollView
+            ref={scrollViewRef}
+            contentContainerStyle={styles.scrollArea}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
+            {messages.length === 0 && !loading && (
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyTitle}>Start a conversation</Text>
+                <Text style={styles.emptySubtitle}>
+                  Ask anything about your health and I&apos;ll assist you.
+                </Text>
+              </View>
+            )}
 
-            <TouchableOpacity
-              onPress={handleSend}
-              disabled={!input.trim() || loading}
-              style={[
-                styles.sendBtn,
-                input.trim() ? styles.sendEnabled : styles.sendDisabled,
-              ]}
-            >
-              <Text style={styles.sendIcon}>➤</Text>
-            </TouchableOpacity>
+            {messages.map((msg) => (
+              <View
+                key={msg.id}
+                style={[
+                  styles.msgRow,
+                  msg.sender === "assistant" ? styles.leftAlign : styles.rightAlign,
+                ]}
+              >
+                {msg.sender === "assistant" && (
+                  <Image source={assistantAvatar} style={styles.avatar} />
+                )}
+
+                <View
+                  style={[
+                    styles.chatBubble,
+                    msg.sender === "assistant"
+                      ? styles.assistantBubble
+                      : styles.userBubble,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.chatText,
+                      msg.sender === "assistant"
+                        ? styles.assistantText
+                        : styles.userText,
+                    ]}
+                  >
+                    {msg.text}
+                  </Text>
+                </View>
+
+                {msg.sender === "user" && (
+                  <Image source={userAvatar} style={styles.avatar} />
+                )}
+              </View>
+            ))}
+
+            {loading && (
+              <View style={[styles.msgRow, styles.leftAlign]}>
+                <Image source={assistantAvatar} style={styles.avatar} />
+                <View style={[styles.chatBubble, styles.assistantBubble]}>
+                  <Text style={styles.assistantText}>
+                    Thinking...
+                  </Text>
+                </View>
+              </View>
+            )}
+          </ScrollView>
+
+          {/* Input bar */}
+          <View style={styles.inputWrapper}>
+            <View style={styles.inputBox}>
+              <TextInput
+                style={styles.input}
+                value={input}
+                onChangeText={setInput}
+                placeholder="Message Sanjeevani AI..."
+                placeholderTextColor={theme === "dark" ? "#86c49d" : "#6b9885"}
+                multiline
+                returnKeyType="send"
+                onSubmitEditing={handleSend}
+              />
+              <TouchableOpacity
+                onPress={handleSend}
+                disabled={!input.trim() || loading}
+                style={[
+                  styles.sendBtn,
+                  (!input.trim() || loading) && styles.sendDisabled,
+                ]}
+              >
+                <Text style={styles.sendIcon}>➤</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </KeyboardAvoidingView>
@@ -217,136 +217,167 @@ export default function WebChatPage() {
   );
 }
 
-const isDark = (t: string) => t === "dark";
-
-// -----------------------------
-// NEW DESIGN STYLES APPLIED
-// -----------------------------
 function getStyles(theme: string) {
-  const dark = isDark(theme);
+  const isDark = theme === "dark";
+  // Same accent family as prediction/login
+  const primaryGreen = "#22c55e";
+  const userBubbleGreen = "#16a34a";
 
   return StyleSheet.create({
-    page: {
+    wrapper: {
       flex: 1,
-      backgroundColor: dark ? "#0c0f0d" : "#eef5ef",
+      backgroundColor: isDark ? "#020617" : "#eef9f2", // soft mint for light
+    },
+    kav: {
+      flex: 1,
+    },
+    chatContainer: {
+      flex: 1,
+      position: "relative",
+      paddingHorizontal: 8,
+      paddingBottom: 8,
     },
 
-    chatWrapper: {
-      flex: 1,
-      maxWidth: 600,
-      width: "100%",
+    // watermark style (transparent, behind content)
+    chatLogoBg: {
+      position: "absolute",
+      top: "28%",
       alignSelf: "center",
+      width: 220,
+      height: 220,
+      opacity: isDark ? 0.06 : 0.04,
+      resizeMode: "contain",
+      zIndex: 0,
+      tintColor: isDark ? undefined : "#a5d6ba",
     },
 
-    messagesContainer: {
-      paddingHorizontal: 14,
-      paddingTop: 16,
-      paddingBottom: 20,
+    scrollArea: {
+      paddingHorizontal: 6,
+      paddingTop: 10,
+      paddingBottom: 12,
     },
-
-    placeholder: {
-      color: dark ? "#9EBCA0" : "#5F8B65",
-      fontSize: 16,
+    msgRow: {
+      flexDirection: "row",
+      alignItems: "flex-end",
+      marginVertical: 6,
+      width: "100%",
+    },
+    leftAlign: {
+      justifyContent: "flex-start",
+    },
+    rightAlign: {
+      flexDirection: "row-reverse",
+      justifyContent: "flex-end",
+    },
+    avatar: {
+      width: 30,
+      height: 30,
+      borderRadius: 15,
+      marginHorizontal: 7,
+      backgroundColor: isDark ? "#022c22" : "#e0f7eb",
+    },
+    chatBubble: {
+      paddingHorizontal: 16,
+      paddingVertical: 10,
+      maxWidth: "78%",
+      borderRadius: 18,
+    },
+    assistantBubble: {
+      backgroundColor: isDark ? "#0b1f16" : "#ffffff",
+      borderWidth: 1.2,
+      borderColor: isDark ? "#22c55e80" : "#bbf7d0",
+      borderTopLeftRadius: 8,
+      shadowColor: "#000",
+      shadowOpacity: isDark ? 0.35 : 0.06,
+      shadowRadius: 8,
+      shadowOffset: { width: 0, height: 3 },
+      elevation: 2,
+    },
+    userBubble: {
+      backgroundColor: isDark ? primaryGreen : userBubbleGreen,
+      borderRadius: 18,
+      shadowColor: "#000",
+      shadowOpacity: isDark ? 0.35 : 0.09,
+      shadowRadius: 8,
+      shadowOffset: { width: 0, height: 3 },
+      elevation: 3,
+    },
+    chatText: {
+      fontSize: 15.5,
+      lineHeight: 22,
+    },
+    assistantText: {
+      color: isDark ? "#dcffee" : "#064e3b",
       fontWeight: "500",
     },
-
-    row: {
-      flexDirection: "row",
-      marginBottom: 14,
-      alignItems: "flex-end",
-    },
-    rowLeft: { alignSelf: "flex-start" },
-    rowRight: { alignSelf: "flex-end", flexDirection: "row-reverse" },
-
-    avatar: {
-      width: 26,
-      height: 26,
-      borderRadius: 13,
-      borderWidth: 1.2,
-      borderColor: dark ? "#2ECC71" : "#0F7A38",
-    },
-
-    bubble: {
-      maxWidth: "78%",
-      paddingHorizontal: 18,
-      paddingVertical: 12,
-      borderRadius: 20,
-      marginHorizontal: 8,
-      shadowColor: dark ? "#0aff71" : "#3BBF78",
-      shadowOpacity: dark ? 0.22 : 0.1,
-      shadowRadius: 10,
-      shadowOffset: { width: 0, height: 4 },
-      elevation: 4,
-    },
-
-    assistantBubble: {
-      backgroundColor: dark ? "#1a1d1c" : "#f0f5f1",
-      borderWidth: 1,
-      borderColor: dark ? "#213329" : "#d8f3df",
-    },
-
-    userBubble: {
-      backgroundColor: dark ? "rgba(60,200,90,0.22)" : "rgba(34,197,94,0.18)",
-      borderWidth: 1,
-      borderColor: dark ? "#1f5d39" : "#b8ebc8",
-    },
-
-    assistantText: {
-      color: dark ? "#e7ffe9" : "#2a3d31",
-      fontSize: 16,
-      lineHeight: 22,
-    },
-
     userText: {
-      color: dark ? "#ffffff" : "#0a4225",
-      fontSize: 16,
-      lineHeight: 22,
+      color: "#ffffff",
+      fontWeight: "600",
+    },
+
+    emptyState: {
+      alignItems: "center",
+      marginTop: 40,
+      marginBottom: 10,
+    },
+    emptyTitle: {
+      fontSize: 18,
+      fontWeight: "700",
+      color: isDark ? "#e5e7eb" : "#064e3b",
+      marginBottom: 4,
+    },
+    emptySubtitle: {
+      fontSize: 14,
+      color: isDark ? "#9ca3af" : "#6b7280",
+      textAlign: "center",
+      maxWidth: 320,
     },
 
     inputWrapper: {
-      paddingHorizontal: 14,
-      backgroundColor: dark ? "#0c0f0d" : "#eef5ef",
+      paddingHorizontal: 4,
+      paddingBottom: Platform.OS === "ios" ? 6 : 4,
+      paddingTop: 4,
     },
-
-    inputBar: {
+    inputBox: {
       flexDirection: "row",
       alignItems: "center",
-      backgroundColor: dark ? "#0e1310" : "#ffffff",
+      width: "100%",
+      backgroundColor: isDark ? "#020817" : "#ffffff",
       borderRadius: 30,
-      borderWidth: 1.6,
-      borderColor: dark ? "#1f3b26" : "#7ed9a0",
-      paddingLeft: 18,
-      paddingRight: 6,
-      paddingVertical: 8,
-      shadowColor: "#2ECC71",
-      shadowOpacity: 0.18,
+      paddingLeft: 16,
+      paddingVertical: 6,
+      borderWidth: 1.5,
+      borderColor: isDark ? "#14532d" : "#bbf7d0",
+      elevation: 4,
+      shadowColor: "#000",
+      shadowOpacity: isDark ? 0.4 : 0.12,
       shadowRadius: 10,
-      elevation: 5,
+      shadowOffset: { width: 0, height: 4 },
     },
-
     input: {
       flex: 1,
-      color: dark ? "#e8ffe1" : "#1c362a",
-      fontSize: 16.5,
-      paddingVertical: 8,
+      fontSize: 16,
+      color: isDark ? "#e1f9e5" : "#064e3b",
+      paddingVertical: 6,
+      paddingRight: 8,
     },
-
     sendBtn: {
-      width: 46,
-      height: 46,
-      borderRadius: 23,
+      width: 44,
+      height: 44,
+      backgroundColor: primaryGreen,
+      borderRadius: 22,
       alignItems: "center",
       justifyContent: "center",
-      backgroundColor: "#22c55e",
+      marginRight: 5,
     },
-
-    sendEnabled: { opacity: 1 },
-    sendDisabled: { opacity: 0.45 },
-
+    sendDisabled: {
+      opacity: 0.4,
+    },
     sendIcon: {
       color: "#fff",
-      fontSize: 20,
-      fontWeight: "bold",
+      fontWeight: "800",
+      fontSize: 22,
+      marginBottom: 1,
     },
   });
 }

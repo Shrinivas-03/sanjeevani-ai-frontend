@@ -1,28 +1,29 @@
 // app/screens/HistoryScreen.tsx
-import React, { useEffect, useState, useRef } from "react";
+import BrandHeader from "@/components/brand-header";
 import {
-  Text,
-  View,
-  TouchableOpacity,
-  FlatList,
+  deleteAllConversations,
+  deleteConversation,
+  getConversation,
+  listConversations,
+} from "@/constants/api";
+import { useAuth } from "@/context/auth";
+import { useAppTheme } from "@/context/theme";
+import { Ionicons } from "@expo/vector-icons";
+import React, { useEffect, useRef, useState } from "react";
+import {
   ActivityIndicator,
-  ScrollView,
-  Pressable,
   Alert,
-  TextInput,
+  FlatList,
   KeyboardAvoidingView,
   Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
-import BrandHeader from "@/components/brand-header";
-import { useAppTheme } from "@/context/theme";
-import { useAuth } from "@/context/auth";
-import {
-  listConversations,
-  getConversation,
-  deleteConversation,
-  deleteAllConversations,
-} from "@/constants/api";
-import { Ionicons } from "@expo/vector-icons";
 
 const API_BASE =
   process.env.EXPO_PUBLIC_API_BASE_URL || "http://127.0.0.1:5000";
@@ -134,7 +135,8 @@ export default function HistoryScreen() {
   }
 
   async function handleDeleteConvo() {
-    if (!user?.email || !selectedConvo) return;
+    const email = user?.email;
+    if (!email || !selectedConvo) return;
     Alert.alert(
       "Delete Conversation",
       "Are you sure you want to delete this chat?",
@@ -146,7 +148,7 @@ export default function HistoryScreen() {
           onPress: async () => {
             setLoading(true);
             try {
-              await deleteConversation(user.email, selectedConvo);
+              await deleteConversation(email, selectedConvo);
               setSelectedConvo(null);
               setMessages([]);
               await fetchConvoList();
@@ -163,7 +165,8 @@ export default function HistoryScreen() {
   }
 
   async function handleDeleteAll() {
-    if (!user?.email) return;
+    const email = user?.email;
+    if (!email) return;
     Alert.alert(
       "Delete All Chats",
       "Delete all chat history for your account? This cannot be undone.",
@@ -175,7 +178,7 @@ export default function HistoryScreen() {
           onPress: async () => {
             setLoading(true);
             try {
-              await deleteAllConversations(user.email);
+              await deleteAllConversations(email);
               setSelectedConvo(null);
               setMessages([]);
               await fetchConvoList();
@@ -249,218 +252,94 @@ export default function HistoryScreen() {
     }
   }
 
-  // Theme colors
-  const primary = "#2ecc40";
-  const accent = theme === "dark" ? "#6ee7b7" : "#388e3c";
+  // THEME TOKENS (matched to chat/prediction)
+  const primary = "#22c55e";
+  const accent = theme === "dark" ? "#9EBCA0" : "#0b3d91";
+  const bgLight = theme === "dark" ? "#020617" : "#eef9f2";
+  const cardBg = theme === "dark" ? "rgba(26,29,28,0.42)" : "rgba(255,255,255,0.92)";
+  const topBarBg = theme === "dark" ? "rgba(44,204,64,0.08)" : "#e9fbee";
 
-  // UPDATED BACKGROUND COLOR (MATCH SIGNIN / SIGNUP)
-  const bgLight = theme === "dark" ? "#0f0f10" : "#f6f7fa";
-
-  const cardBg = theme === "dark" ? "#222428" : "#fff";
+  // styles derived for component
+  const styles = makeStyles(theme, { primary, accent, bgLight, cardBg, topBarBg });
 
   return (
-    <View style={{ flex: 1, backgroundColor: bgLight }}>
+    <View style={styles.screen}>
       <BrandHeader />
 
       {/* List/History View */}
       {!selectedConvo ? (
-        <View style={{ flex: 1 }}>
-          <Text
-            style={{
-              color: accent,
-              textAlign: "center",
-              fontSize: 21,
-              fontWeight: "bold",
-              marginTop: 28,
-              letterSpacing: 0.2,
-            }}
-          >
-            Your Chat History
-          </Text>
+        <View style={styles.container}>
+          <Text style={styles.title}>Your Chat History</Text>
 
-          <Pressable
-            style={{
-              alignSelf: "center",
-              backgroundColor: "#E53935",
-              paddingVertical: 10,
-              paddingHorizontal: 20,
-              borderRadius: 22,
-              marginTop: 12,
-              marginBottom: 8,
-              elevation: 3,
-            }}
-            onPress={handleDeleteAll}
-          >
-            <Text style={{ color: "#fff", fontWeight: "bold", fontSize: 15 }}>
+          <Pressable style={styles.deleteAllBtn} onPress={handleDeleteAll}>
+            <Text style={styles.deleteAllText}>
               <Ionicons name="trash-outline" size={16} /> Delete All Chats
             </Text>
           </Pressable>
 
           {loading && (
-            <ActivityIndicator
-              size="large"
-              style={{ marginTop: 42 }}
-              color={primary}
-            />
+            <ActivityIndicator size="large" style={{ marginTop: 42 }} color={primary} />
           )}
 
           {!loading && (
             <FlatList
               data={convos}
               keyExtractor={(item) => item.conversation_id}
-              contentContainerStyle={{
-                paddingHorizontal: 18,
-                paddingBottom: 20,
-              }}
+              contentContainerStyle={styles.listContent}
               renderItem={({ item }) => (
                 <TouchableOpacity
-                  style={{
-                    marginVertical: 9,
-                    borderRadius: 18,
-                    backgroundColor:
-                      selectedConvo === item.conversation_id ? primary : cardBg,
-                    elevation: 3,
-                    shadowColor: "#222",
-                    shadowOpacity: 0.07,
-                    shadowRadius: 3,
-                    borderWidth: 1.5,
-                    borderColor:
-                      selectedConvo === item.conversation_id
-                        ? primary
-                        : theme === "dark"
-                          ? "#333"
-                          : "#e8efea",
-                  }}
+                  style={[
+                    styles.convoItem,
+                    selectedConvo === item.conversation_id && styles.convoItemActive,
+                  ]}
                   onPress={() => handleSelectConversation(item.conversation_id)}
                   activeOpacity={0.82}
                 >
-                  <View
-                    style={{
-                      flexDirection: "row",
-                      alignItems: "center",
-                      padding: 18,
-                    }}
-                  >
-                    <View
-                      style={{
-                        width: 40,
-                        height: 40,
-                        borderRadius: 20,
-                        backgroundColor: primary,
-                        alignItems: "center",
-                        justifyContent: "center",
-                        marginRight: 11,
-                      }}
-                    >
-                      <Ionicons
-                        name="chatbubble-ellipses-outline"
-                        size={22}
-                        color="#fff"
-                      />
+                  <View style={styles.convoInner}>
+                    <View style={styles.convoIcon}>
+                      <Ionicons name="chatbubble-ellipses-outline" size={22} color="#fff" />
                     </View>
 
                     <View style={{ flex: 1 }}>
                       <Text
-                        style={{
-                          color:
-                            selectedConvo === item.conversation_id
-                              ? "#fff"
-                              : accent,
-                          fontSize: 16,
-                          fontWeight:
-                            selectedConvo === item.conversation_id
-                              ? "bold"
-                              : "600",
-                        }}
+                        style={[
+                          styles.convoPreview,
+                          selectedConvo === item.conversation_id && styles.convoPreviewActive,
+                        ]}
                         numberOfLines={2}
                       >
                         {item.preview}
                       </Text>
                     </View>
 
-                    <Ionicons
-                      name="chevron-forward-outline"
-                      size={21}
-                      color="#bbb"
-                      style={{ marginLeft: 9 }}
-                    />
+                    <Ionicons name="chevron-forward-outline" size={21} color="#bbb" style={{ marginLeft: 9 }} />
                   </View>
                 </TouchableOpacity>
               )}
               ListEmptyComponent={
-                <Text
-                  style={{
-                    color: theme === "dark" ? "#fff" : "#666",
-                    textAlign: "center",
-                    opacity: 0.7,
-                    marginTop: 50,
-                  }}
-                >
-                  No chat conversations yet.
-                </Text>
+                <Text style={styles.emptyText}>No chat conversations yet.</Text>
               }
             />
           )}
         </View>
       ) : (
         <KeyboardAvoidingView
-          style={{ flex: 1, backgroundColor: bgLight }}
+          style={[styles.container, { backgroundColor: bgLight }]}
           behavior={Platform.OS === "ios" ? "padding" : undefined}
           keyboardVerticalOffset={120}
         >
           {/* Top bar */}
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "space-between",
-              paddingVertical: 16,
-              paddingHorizontal: 18,
-              borderBottomWidth: 1,
-              borderBottomColor: theme === "dark" ? "#222" : "#e0e0e0",
-              backgroundColor:
-                theme === "dark" ? "rgba(44,204,64,0.13)" : "#e9fbee",
-            }}
-          >
+          <View style={[styles.topBar, { backgroundColor: topBarBg }]}>
             <View style={{ flexDirection: "row", alignItems: "center" }}>
-              <Pressable
-                onPress={handleBack}
-                style={{
-                  marginRight: 7,
-                  padding: 7,
-                  borderRadius: 25,
-                  backgroundColor: theme === "dark" ? primary : "#cdf3e4",
-                }}
-              >
-                <Ionicons
-                  name="arrow-back"
-                  size={23}
-                  color={theme === "dark" ? "#fff" : accent}
-                />
+              <Pressable onPress={handleBack} style={styles.backBtn}>
+                <Ionicons name="arrow-back" size={23} color={theme === "dark" ? "#fff" : accent} />
               </Pressable>
 
-              <Text
-                style={{
-                  fontSize: 20,
-                  fontWeight: "bold",
-                  color: accent,
-                  marginLeft: 3,
-                }}
-              >
-                Conversation
-              </Text>
+              <Text style={styles.conversationTitle}>Conversation</Text>
             </View>
 
-            <Pressable
-              onPress={handleDeleteConvo}
-              style={{
-                paddingHorizontal: 17,
-                paddingVertical: 7,
-                borderRadius: 22,
-                backgroundColor: "#E53935",
-              }}
-            >
-              <Text style={{ color: "#fff", fontWeight: "bold", fontSize: 15 }}>
+            <Pressable onPress={handleDeleteConvo} style={styles.deleteBtn}>
+              <Text style={styles.deleteBtnText}>
                 <Ionicons name="trash-bin-outline" size={15} /> Delete
               </Text>
             </Pressable>
@@ -469,140 +348,49 @@ export default function HistoryScreen() {
           <ScrollView
             ref={scrollViewRef}
             style={{ flex: 1, padding: 14, backgroundColor: bgLight }}
-            contentContainerStyle={{
-              paddingBottom: 100,
-            }}
+            contentContainerStyle={{ paddingBottom: 100 }}
             showsVerticalScrollIndicator={false}
           >
-            {loading && (
-              <ActivityIndicator
-                size="large"
-                style={{ marginTop: 28 }}
-                color={primary}
-              />
-            )}
+            {loading && <ActivityIndicator size="large" style={{ marginTop: 28 }} color={primary} />}
 
             {!loading && messages.length === 0 && (
-              <Text
-                style={{
-                  color: theme === "dark" ? "#fff" : "#444",
-                  textAlign: "center",
-                  opacity: 0.7,
-                  marginTop: 56,
-                }}
-              >
-                No messages in this thread.
-              </Text>
+              <Text style={styles.noMessagesText}>No messages in this thread.</Text>
             )}
 
             {messages.map((m, idx) => (
               <View
                 key={idx}
-                style={{
-                  marginBottom: 16,
-                  padding: 14,
-                  borderRadius: 15,
-                  backgroundColor:
-                    m.role === "user"
-                      ? theme === "dark"
-                        ? "#263238"
-                        : "#cdeee2"
-                      : m.role === "assistant"
-                        ? theme === "dark"
-                          ? "#17803b"
-                          : "#fff"
-                        : theme === "dark"
-                          ? "#333"
-                          : "#e7e7e7",
-                  borderLeftWidth: 5,
-                  borderLeftColor:
-                    m.role === "assistant"
-                      ? primary
-                      : m.role === "user"
-                        ? "#0288D1"
-                        : "#9e9e9e",
-                }}
+                style={[
+                  styles.messageCard,
+                  m.role === "user" ? styles.userCard : m.role === "assistant" ? styles.assistantCard : styles.systemCard,
+                ]}
               >
                 <View style={{ flexDirection: "row", alignItems: "center" }}>
                   <Ionicons
-                    name={
-                      m.role === "assistant"
-                        ? "logo-react"
-                        : m.role === "user"
-                          ? "person"
-                          : "help-circle"
-                    }
+                    name={m.role === "assistant" ? "logo-react" : m.role === "user" ? "person" : "help-circle"}
                     size={18}
-                    color={
-                      m.role === "assistant"
-                        ? primary
-                        : m.role === "user"
-                          ? "#0288D1"
-                          : "#9e9e9e"
-                    }
-                    style={{ marginRight: 5 }}
+                    color={m.role === "assistant" ? primary : m.role === "user" ? "#0288D1" : "#9e9e9e"}
+                    style={{ marginRight: 6 }}
                   />
-                  <Text
-                    style={{
-                      fontWeight: "bold",
-                      color:
-                        m.role === "user"
-                          ? "#0288D1"
-                          : m.role === "assistant"
-                            ? primary
-                            : "#9e9e9e",
-                    }}
-                  >
-                    {m.role === "assistant"
-                      ? "Assistant"
-                      : m.role.charAt(0).toUpperCase() + m.role.slice(1)}
+                  <Text style={styles.messageRole}>
+                    {m.role === "assistant" ? "Assistant" : m.role.charAt(0).toUpperCase() + m.role.slice(1)}
                   </Text>
                 </View>
 
-                <Text
-                  style={{
-                    color: theme === "dark" ? "#fff" : "#1a242a",
-                    fontSize: 16,
-                    lineHeight: 22,
-                    marginTop: 3,
-                  }}
-                >
-                  {m.message}
-                </Text>
+                <Text style={styles.messageText}>{m.message}</Text>
               </View>
             ))}
           </ScrollView>
 
           {/* Input bar */}
-          <View
-            style={{
-              padding: 12,
-              borderTopWidth: 1,
-              borderTopColor: theme === "dark" ? "#122" : "#e6eef4",
-              backgroundColor: theme === "dark" ? "#071815" : "#fff",
-            }}
-          >
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                gap: 8,
-              }}
-            >
+          <View style={styles.inputBar}>
+            <View style={styles.inputRow}>
               <TextInput
                 value={inputText}
                 onChangeText={setInputText}
                 placeholder="Type a message..."
-                placeholderTextColor={theme === "dark" ? "#9aa" : "#9aa"}
-                style={{
-                  flex: 1,
-                  backgroundColor: theme === "dark" ? "#071a12" : "#f6fbf8",
-                  paddingVertical: 10,
-                  paddingHorizontal: 12,
-                  borderRadius: 22,
-                  fontSize: 15,
-                  color: theme === "dark" ? "#fff" : "#0b3a28",
-                }}
+                placeholderTextColor={theme === "dark" ? "#9aa" : "#7b8b7b"}
+                style={styles.input}
                 multiline
                 returnKeyType="send"
                 onSubmitEditing={() => {
@@ -613,22 +401,12 @@ export default function HistoryScreen() {
               <TouchableOpacity
                 onPress={handleSendMessage}
                 disabled={sending || inputText.trim().length === 0}
-                style={{
-                  width: 48,
-                  height: 48,
-                  borderRadius: 24,
-                  alignItems: "center",
-                  justifyContent: "center",
-                  backgroundColor:
-                    inputText.trim().length === 0 ? "#9ee6b1" : primary,
-                  opacity: inputText.trim().length === 0 ? 0.6 : 1,
-                }}
+                style={[
+                  styles.sendBtn,
+                  inputText.trim().length === 0 ? styles.sendBtnDisabled : null,
+                ]}
               >
-                {sending ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <Ionicons name="send" size={20} color="#fff" />
-                )}
+                {sending ? <ActivityIndicator color="#fff" /> : <Ionicons name="send" size={20} color="#fff" />}
               </TouchableOpacity>
             </View>
           </View>
@@ -636,4 +414,195 @@ export default function HistoryScreen() {
       )}
     </View>
   );
+}
+
+/* Styles factory so styles update with theme tokens */
+function makeStyles(theme: any, tokens: any) {
+  const isDark = theme === "dark";
+  const { primary, accent, bgLight, cardBg, topBarBg } = tokens;
+
+  return StyleSheet.create({
+    screen: {
+      flex: 1,
+      backgroundColor: bgLight,
+    },
+    container: {
+      flex: 1,
+      paddingHorizontal: 6,
+    },
+    title: {
+      color: accent,
+      textAlign: "center",
+      fontSize: 21,
+      fontWeight: "bold",
+      marginTop: 28,
+      letterSpacing: 0.2,
+    },
+    deleteAllBtn: {
+      alignSelf: "center",
+      backgroundColor: "#E53935",
+      paddingVertical: 10,
+      paddingHorizontal: 20,
+      borderRadius: 22,
+      marginTop: 12,
+      marginBottom: 8,
+      elevation: 3,
+    },
+    deleteAllText: {
+      color: "#fff",
+      fontWeight: "bold",
+      fontSize: 15,
+    },
+    listContent: {
+      paddingHorizontal: 18,
+      paddingBottom: 20,
+    },
+    convoItem: {
+      marginVertical: 9,
+      borderRadius: 18,
+      backgroundColor: cardBg,
+      elevation: 3,
+      shadowColor: "#000",
+      shadowOpacity: isDark ? 0.12 : 0.04,
+      shadowRadius: 6,
+      borderWidth: 1,
+      borderColor: isDark ? "rgba(33,51,41,0.5)" : "rgba(231,249,237,0.6)",
+    },
+    convoItemActive: {
+      backgroundColor: primary,
+      borderColor: primary,
+    },
+    convoInner: {
+      flexDirection: "row",
+      alignItems: "center",
+      padding: 18,
+    },
+    convoIcon: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: primary,
+      alignItems: "center",
+      justifyContent: "center",
+      marginRight: 11,
+    },
+    convoPreview: {
+      color: accent,
+      fontSize: 16,
+      fontWeight: "600",
+    },
+    convoPreviewActive: {
+      color: "#fff",
+      fontWeight: "bold",
+    },
+    emptyText: {
+      color: isDark ? "#fff" : "#666",
+      textAlign: "center",
+      opacity: 0.75,
+      marginTop: 50,
+    },
+
+    topBar: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingVertical: 16,
+      paddingHorizontal: 18,
+      borderBottomWidth: 1,
+      borderBottomColor: isDark ? "#222" : "#e0e0e0",
+      backgroundColor: topBarBg,
+    },
+    backBtn: {
+      marginRight: 7,
+      padding: 7,
+      borderRadius: 25,
+      backgroundColor: isDark ? primary : "#cdf3e4",
+    },
+    conversationTitle: {
+      fontSize: 20,
+      fontWeight: "bold",
+      color: accent,
+      marginLeft: 3,
+    },
+    deleteBtn: {
+      paddingHorizontal: 17,
+      paddingVertical: 7,
+      borderRadius: 22,
+      backgroundColor: "#E53935",
+    },
+    deleteBtnText: {
+      color: "#fff",
+      fontWeight: "bold",
+      fontSize: 15,
+    },
+
+    noMessagesText: {
+      color: isDark ? "#fff" : "#444",
+      textAlign: "center",
+      opacity: 0.75,
+      marginTop: 56,
+    },
+
+    messageCard: {
+      marginBottom: 16,
+      padding: 14,
+      borderRadius: 15,
+      borderLeftWidth: 5,
+    },
+    userCard: {
+      backgroundColor: isDark ? "rgba(38,50,56,0.6)" : "#cdeee2",
+      borderLeftColor: "#0288D1",
+    },
+    assistantCard: {
+      backgroundColor: isDark ? "rgba(23,128,59,0.9)" : "#fff",
+      borderLeftColor: primary,
+    },
+    systemCard: {
+      backgroundColor: isDark ? "#333" : "#e7e7e7",
+      borderLeftColor: "#9e9e9e",
+    },
+    messageRole: {
+      fontWeight: "700",
+      color: isDark ? "#e7ffe9" : primary,
+    },
+    messageText: {
+      color: isDark ? "#fff" : "#1a242a",
+      fontSize: 16,
+      lineHeight: 22,
+      marginTop: 8,
+    },
+
+    inputBar: {
+      padding: 12,
+      borderTopWidth: 1,
+      borderTopColor: isDark ? "#122" : "#e6eef4",
+      backgroundColor: isDark ? "#071815" : "#fff",
+    },
+    inputRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+    },
+    input: {
+      flex: 1,
+      backgroundColor: isDark ? "#071a12" : "#f6fbf8",
+      paddingVertical: 10,
+      paddingHorizontal: 12,
+      borderRadius: 22,
+      fontSize: 15,
+      color: isDark ? "#fff" : "#0b3a28",
+    },
+    sendBtn: {
+      width: 48,
+      height: 48,
+      borderRadius: 24,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: primary,
+    },
+    sendBtnDisabled: {
+      backgroundColor: "#9ee6b1",
+      opacity: 0.6,
+    },
+  });
 }

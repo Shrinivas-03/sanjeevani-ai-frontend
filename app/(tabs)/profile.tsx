@@ -1,21 +1,21 @@
 import BrandHeader from "@/components/brand-header";
-import { getAccessToken } from "@/constants/api";
+import { API_BASE_URL, authenticatedFetch, getAccessToken } from "@/constants/api";
 import { useAuth } from "@/context/auth";
 import { useAppTheme } from "@/context/theme";
 import { router } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
-  Alert,
-  Image,
-  Keyboard,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    Alert,
+    Image,
+    Keyboard,
+    KeyboardAvoidingView,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -34,14 +34,10 @@ export default function ProfileScreen() {
 
   const fetchUserDetails = async () => {
     const token = await getAccessToken();
+    const url = `${API_BASE_URL}/api/auth/user-details`;
+    console.warn("profile: will fetch user details from:", url, "token?", !!token);
     try {
-      const response = await fetch(
-        `${process.env.EXPO_PUBLIC_API_BASE_URL}/api/auth/user-details`,
-        {
-          method: "GET",
-          headers: { Authorization: `Bearer ${token}` },
-        },
-      );
+      const response = await authenticatedFetch(url, { method: "GET" });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error);
 
@@ -50,36 +46,31 @@ export default function ProfileScreen() {
       setBloodGroup(data.user.blood_group);
       setDiseases(data.user.existing_diseases);
     } catch (e: any) {
-      console.error("Fetch error:", e.message);
+      console.error("Fetch error:", e, 'url:', url);
     }
   };
 
   const updateUserProfile = async () => {
     const token = await getAccessToken();
     try {
-      const res = await fetch(
-        `${process.env.EXPO_PUBLIC_API_BASE_URL}/api/auth/edit-profile`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            fullName,
-            email,
-            bloodGroup,
-            existingDiseases: diseases,
-          }),
-        },
-      );
+      const res = await authenticatedFetch(`${API_BASE_URL}/api/auth/edit-profile`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fullName,
+          email,
+          bloodGroup,
+          existingDiseases: diseases,
+        }),
+      });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
 
       Alert.alert("Success", "Profile updated successfully");
       setIsEditing(false);
     } catch (e: any) {
-      Alert.alert("Error", e.message);
+      console.error("Update profile error:", e);
+      Alert.alert("Error", e.message || "Failed to update profile");
     }
   };
 

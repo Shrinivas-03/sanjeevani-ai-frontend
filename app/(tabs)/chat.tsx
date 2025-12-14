@@ -222,7 +222,7 @@ function getStyles(theme: string) {
   const isDark = theme === "dark";
 
   return StyleSheet.create({
-    wrapper: { flex: 1, backgroundColor: isDark ? "#020617" : "#10d97b5a" },
+    wrapper: { flex: 1, backgroundColor: isDark ? "#020617" : "#dae5e5ff" },
     chatContainer: { flex: 1, paddingHorizontal: 8 },
 
     chatLogoBg: {
@@ -258,6 +258,10 @@ function getStyles(theme: string) {
       borderTopLeftRadius: 18,
       borderBottomLeftRadius: 18,
       borderBottomRightRadius: 18,
+            borderWidth: 1,
+
+      borderColor: isDark ? "#6c5ad4f5" : "#dce8e0ff",
+
     },
 
     /* ASSISTANT → LEFT */

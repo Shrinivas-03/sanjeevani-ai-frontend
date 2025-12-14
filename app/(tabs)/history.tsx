@@ -325,14 +325,14 @@ export default function HistoryScreen() {
       ) : (
         <KeyboardAvoidingView
           style={[styles.container, { backgroundColor: bgLight }]}
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
-          keyboardVerticalOffset={120}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          keyboardVerticalOffset={0}
         >
           {/* Top bar */}
           <View style={[styles.topBar, { backgroundColor: topBarBg }]}>
             <View style={{ flexDirection: "row", alignItems: "center" }}>
               <Pressable onPress={handleBack} style={styles.backBtn}>
-                <Ionicons name="arrow-back" size={23} color={theme === "dark" ? "#fff" : accent} />
+                <Ionicons name="arrow-back" size={13} color={theme === "dark" ? "#fff" : accent} />
               </Pressable>
 
               <Text style={styles.conversationTitle}>Conversation</Text>
@@ -509,7 +509,7 @@ function makeStyles(theme: any, tokens: any) {
       paddingVertical: 16,
       paddingHorizontal: 18,
       borderBottomWidth: 1,
-      borderBottomColor: isDark ? "#222" : "#e0e0e0",
+      borderBottomColor: isDark ? "#b243e5ff" : "#4bc49aff",
       backgroundColor: topBarBg,
     },
     backBtn: {
@@ -585,9 +585,9 @@ function makeStyles(theme: any, tokens: any) {
     },
     input: {
       flex: 1,
-      backgroundColor: isDark ? "#071a12" : "#f6fbf8",
-      paddingVertical: 10,
-      paddingHorizontal: 12,
+      backgroundColor: isDark ? "#1f503cea" : "#f6fbf8",
+      paddingVertical: 15,
+      paddingHorizontal: 18,
       borderRadius: 22,
       fontSize: 15,
       color: isDark ? "#fff" : "#0b3a28",
@@ -601,7 +601,7 @@ function makeStyles(theme: any, tokens: any) {
       backgroundColor: primary,
     },
     sendBtnDisabled: {
-      backgroundColor: "#9ee6b1",
+      backgroundColor: "#11e993ff",
       opacity: 0.6,
     },
   });

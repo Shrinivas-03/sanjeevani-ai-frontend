@@ -299,7 +299,7 @@ export default function BrandHeader({
 const styles = StyleSheet.create({
   wrapper: {
     width: "100%",
-    paddingTop: 28,
+    paddingTop: 30,
     paddingBottom: 0,
     alignItems: "center",
   },

@@ -1,352 +1,357 @@
-export const options = { headerShown: false }; // For Expo Router or Next/Expo stack navigation
-
-import React from "react";
-import {
-  View,
-  Text,
-  Image,
-  ScrollView,
-  StyleSheet,
-  TouchableOpacity,
-  Platform,
-  StatusBar,
-} from "react-native";
 import { useAppTheme } from "@/context/theme";
-import { useNavigation } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
+import { useNavigation } from "@react-navigation/native";
+import * as Linking from "expo-linking";
+import { Stack } from "expo-router";
+import React, { useEffect, useRef } from "react";
+import {
+  Animated,
+  Image,
+  Platform,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 
-// CUSTOM HEADER - only this will show, no native nav-bar!
+/* ---------------- HEADER ---------------- */
+
 function AboutHeader() {
   const { theme } = useAppTheme();
   const navigation = useNavigation();
   const isDark = theme === "dark";
   const STATUSBAR_HEIGHT =
     Platform.OS === "ios" ? 44 : StatusBar.currentHeight || 30;
-  const headerStyles = StyleSheet.create({
-    header: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
-      paddingHorizontal: 15,
-      paddingBottom: 7,
-      backgroundColor: isDark ? "#151718" : "#f5f6f7",
-      paddingTop: STATUSBAR_HEIGHT + 2,
-    },
-    backBtn: {
-      padding: 7,
-      borderRadius: 24,
-      backgroundColor: "transparent",
-    },
-    headerBrand: {
-      flexDirection: "row",
-      alignItems: "center",
-      flex: 1,
-      justifyContent: "center",
-      marginLeft: -32,
-    },
-    brandLogo: {
-      width: 30,
-      height: 30,
-      borderRadius: 15,
-      marginRight: 10,
-    },
-    brandText: {
-      fontSize: 22,
-      fontWeight: "bold",
-      color: "#2ecc40",
-      letterSpacing: 0.12,
-    },
-  });
+
   return (
-    <View style={headerStyles.header}>
+    <View style={[styles.header, { paddingTop: STATUSBAR_HEIGHT + 6 }]}>
       <TouchableOpacity
-        style={headerStyles.backBtn}
         onPress={() => navigation.goBack()}
-        activeOpacity={0.87}
+        style={styles.backBtn}
+        activeOpacity={0.8}
       >
         <Ionicons
           name="arrow-back"
           size={26}
-          color={isDark ? "#fafafa" : "#222"}
+          color={isDark ? "#ffffff" : "#222"}
         />
       </TouchableOpacity>
-      <View style={headerStyles.headerBrand}>
+
+      <View style={styles.headerBrand}>
         <Image
           source={require("@/assets/images/logo.png")}
-          style={headerStyles.brandLogo}
+          style={styles.headerLogo}
         />
-        <Text style={headerStyles.brandText}>Sanjeevani AI</Text>
+        <Text style={styles.headerTitle}>Sanjeevani AI</Text>
       </View>
-      <View style={{ width: 30 }} />
     </View>
   );
 }
+
+/* ---------------- SCREEN ---------------- */
 
 export default function AboutScreen() {
-  const { theme } = useAppTheme();
-  const styles = getStyles(theme || "light");
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(30)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 700,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 700,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
+
+  const developers = [
+    {
+      name: "Shrinivas N",
+      role: "Data Scientist",
+      img: require("@/assets/images/shri.png"),
+      linkedin: "https://www.https://www.linkedin.com/in/shrinivas-nadager?lipi=urn%3Ali%3Apage%3Ad_flagship3_profile_view_base_contact_details%3B8WZRnrXkTbym4xNJvVL7Dg%3D%3D.com/in/shrinivas-n/",
+    },
+    {
+      name: "Basavaraj H G",
+      role: "Data Analyst | Security Engineer",
+      img: require("@/assets/images/Basu.jpeg"),
+      linkedin: "https://www.linkedin.com/in/basavaraj-h-gurikar-95b739284?lipi=urn%3Ali%3Apage%3Ad_flagship3_profile_view_base_contact_details%3BSDw9ad7OTf6c2XD8sqZjKw%3D%3D"
+     },
+    
+    {
+      name: "Meenakshi",
+      role: "ML Engineer",
+      img: require("@/assets/images/sonu.png"),
+      linkedin: "https://www.linkedin.com/in/meenakshi-mallikarjun-a999b626b?lipi=urn%3Ali%3Apage%3Ad_flagship3_profile_view_base_contact_details%3B1IdtUvOXRqWKgVm19bxvTA%3D%3D",
+    },
+    {
+      name: "Samruddhi",
+      role: "ML Engineer",
+      img: require("@/assets/images/sam.png"),
+      linkedin: "https://www.linkedin.com/in/samruddhi-bilgundi-993739284?lipi=urn%3Ali%3Apage%3Ad_flagship3_profile_view_base_contact_details%3BNXfB85oMQMeSo6di632jzA%3D%3D",
+    },
+  ];
 
   return (
-    <View style={styles.container}>
-      <AboutHeader />
-      <ScrollView contentContainerStyle={{ paddingBottom: 48 }}>
-        {/* Hero Section */}
-        <View style={styles.heroSection}>
-          <View style={styles.heroCard}>
-            <View style={styles.heroLogo}>
-              <View style={styles.logoCircle}>
-                <Image
-                  source={require("@/assets/images/logo.png")}
-                  style={styles.heroLogoImage}
-                  resizeMode="contain"
-                />
-              </View>
+    <>
+      <Stack.Screen options={{ headerShown: false }} />
+
+      <View style={styles.container}>
+        <Animated.View style={styles.animatedBg} />
+
+        <AboutHeader />
+
+        <ScrollView contentContainerStyle={{ paddingBottom: 80 }}>
+          {/* HERO */}
+          <Animated.View
+            style={[
+              styles.glassCard,
+              {
+                opacity: fadeAnim,
+                transform: [{ translateY: slideAnim }],
+                marginTop: 30,
+              },
+            ]}
+          >
+            <View style={styles.logoCircle}>
+              <Image
+                source={require("@/assets/images/logo.png")}
+                style={{ width: 44, height: 44 }}
+              />
             </View>
+
             <Text style={styles.heroTitle}>
-              <Text style={styles.heroAccent}>About </Text>
-              Sanjeevani AI
+              <Text style={{ color: "#eeaa3b" }}>About </Text>Sanjeevani AI
             </Text>
-            <Text style={styles.heroSubtitle}>
+
+            <Text style={styles.heroText}>
               Bridging ancient Ayurvedic wisdom with cutting-edge AI technology
-              to revolutionize personalized healthcare and wellness for the
-              modern world.
+              to deliver personalized healthcare for the modern world.
             </Text>
-          </View>
-        </View>
-        {/* Mission Section */}
-        <View style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>Our Mission</Text>
-          <View style={styles.sectionIcon}>
-            <Text style={styles.sectionEmoji}>🎯</Text>
-          </View>
-          <Text style={styles.sectionText}>
-            At Sanjeevani AI, we believe that the ancient wisdom of Ayurveda
-            joined with modern artificial intelligence can provide unprecedented
-            insights into health. Our mission is to make personalized healthcare
-            accessible for everyone—intelligent technology that understands your
-            unique constitution and needs.
-          </Text>
-        </View>
-        {/* Values Section */}
-        <View style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>Our Values</Text>
-          <View style={styles.valuesGrid}>
-            {[
-              {
-                emoji: "🌿",
-                title: "Ancient Wisdom",
-                desc: "We honor and preserve Ayurvedic knowledge, making it accessible via modern tools.",
-              },
-              {
-                emoji: "🔬",
-                title: "Scientific Approach",
-                desc: "Our AI is built on rigorous scientific research and validated clinically.",
-              },
-              {
-                emoji: "🔒",
-                title: "Privacy First",
-                desc: "Your health data is sacred—protected by enterprise-grade security.",
-              },
-              {
-                emoji: "🎯",
-                title: "Personalization",
-                desc: "Every individual is unique. Our AI gives recommendations built for you, not just for all.",
-              },
-            ].map((v) => (
-              <View key={v.title} style={styles.valueCard}>
-                <View style={styles.valueIcon}>
-                  <Text style={styles.valueEmoji}>{v.emoji}</Text>
+          </Animated.View>
+
+          {/* INFO SECTIONS */}
+          {[
+            {
+              title: "Our Mission",
+              emoji: "🎯",
+              text:
+                "We combine Ayurveda and AI to deliver intelligent, personalized healthcare that respects tradition and innovation equally.",
+            },
+            {
+              title: "Our Story",
+              emoji: "👥",
+              text:
+                "Founded by healthcare professionals and AI engineers, Sanjeevani AI exists to make holistic wellness accessible to everyone.",
+            },
+            {
+              title: "Our Vision",
+              emoji: "🌍",
+              text:
+                "A future where personalized healthcare is a right, not a luxury—powered by ethical AI and ancient wisdom.",
+            },
+          ].map((sec, i) => (
+            <Animated.View
+              key={sec.title}
+              style={[
+                styles.glassCard,
+                {
+                  opacity: fadeAnim,
+                  transform: [
+                    {
+                      translateY: Animated.add(
+                        slideAnim,
+                        new Animated.Value(i * 8)
+                      ),
+                    },
+                  ],
+                },
+              ]}
+            >
+              <Text style={styles.sectionTitle}>{sec.title}</Text>
+              <Text style={styles.sectionEmoji}>{sec.emoji}</Text>
+              <Text style={styles.sectionText}>{sec.text}</Text>
+            </Animated.View>
+          ))}
+
+          {/* DEVELOPERS */}
+          <Animated.View style={[styles.glassCard, { opacity: fadeAnim }]}>
+            <Text style={styles.sectionTitle}>Developers</Text>
+
+            <View style={styles.devGrid}>
+              {developers.map((dev) => (
+                <View key={dev.name} style={styles.devCard}>
+                  <Image source={dev.img} style={styles.devAvatar} />
+                  <Text style={styles.devName}>{dev.name}</Text>
+                  <Text style={styles.devRole}>{dev.role}</Text>
+
+                  <TouchableOpacity
+                    style={styles.linkedinBtn}
+                    onPress={() => Linking.openURL(dev.linkedin)}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons
+                      name="logo-linkedin"
+                      size={22}
+                      color="#0A66C2"
+                    />
+                  </TouchableOpacity>
                 </View>
-                <Text style={styles.valueTitle}>{v.title}</Text>
-                <Text style={styles.valueDescription}>{v.desc}</Text>
-              </View>
-            ))}
-          </View>
-        </View>
-        {/* Story Section */}
-        <View style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>Our Story</Text>
-          <View style={styles.sectionIcon}>
-            <Text style={styles.sectionEmoji}>👥</Text>
-          </View>
-          <Text style={styles.sectionText}>
-            Sanjeevani AI was founded by healthcare professionals, AI
-            researchers, and Ayurvedic specialists committed to blending
-            traditional medicine with modern technology. Our team includes
-            experts from medicine, computer science, and ancient
-            therapies—united to build a revolutionary platform.
-          </Text>
-          <Text style={styles.sectionText}>
-            Our journey began with one question: What if Ayurvedic wisdom could
-            become universally accessible? Sanjeevani AI is our answer—a
-            personalized wellness companion, supporting your health journey, and
-            learning from you.
-          </Text>
-        </View>
-        {/* Vision Section */}
-        <View style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>Our Vision</Text>
-          <View style={styles.sectionIcon}>
-            <Text style={styles.sectionEmoji}>🌍</Text>
-          </View>
-          <Text style={styles.sectionText}>
-            We envision a world where personalized healthcare isn't luxury—it's
-            a right. Tradition and innovation should work together so everyone
-            can live healthier, happier lives. Sanjeevani AI is building the
-            future of wellness—one that respects history while driving progress.
-          </Text>
-        </View>
-      </ScrollView>
-    </View>
+              ))}
+            </View>
+          </Animated.View>
+        </ScrollView>
+      </View>
+    </>
   );
 }
 
-function getStyles(theme) {
-  const isDark = theme === "dark";
-  return StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: isDark ? "#151718" : "#f5f6f7",
-    },
-    heroSection: {
-      paddingTop: 32,
-      paddingBottom: 28,
-      alignItems: "center",
-      backgroundColor: isDark ? "#181a1b" : "#f7fafc",
-    },
-    heroCard: {
-      backgroundColor: isDark ? "#222428ee" : "#fff",
-      borderRadius: 26,
-      padding: 40,
-      marginHorizontal: 24,
-      marginBottom: 10,
-      shadowColor: "#2ecc40",
-      shadowOpacity: 0.09,
-      shadowRadius: 18,
-      elevation: 5,
-      alignItems: "center",
-      width: "100%",
-      maxWidth: 600,
-    },
-    heroLogo: {
-      marginBottom: 16,
-    },
-    logoCircle: {
-      width: 80,
-      height: 80,
-      borderRadius: 40,
-      backgroundColor: "#2ecc40",
-      alignItems: "center",
-      justifyContent: "center",
-      borderWidth: 3,
-      borderColor: isDark ? "#1e2022" : "#ffffff",
-    },
-    heroLogoImage: {
-      width: 48,
-      height: 48,
-    },
-    heroAccent: {
-      color: "#eeaa3b",
-      fontWeight: "bold",
-      fontSize: 28,
-    },
-    heroTitle: {
-      fontSize: 32,
-      fontWeight: "bold",
-      color: "#2ecc40",
-      marginBottom: 8,
-      textAlign: "center",
-      letterSpacing: 0.07,
-    },
-    heroSubtitle: {
-      fontSize: 16,
-      color: isDark ? "#9be2b5" : "#258d44",
-      textAlign: "center",
-      lineHeight: 24,
-      marginTop: 8,
-    },
-    sectionCard: {
-      backgroundColor: isDark ? "#222428" : "#fff",
-      borderRadius: 22,
-      padding: 28,
-      marginHorizontal: 24,
-      marginVertical: 14,
-      shadowColor: "#2ecc40",
-      shadowOpacity: 0.06,
-      shadowRadius: 14,
-      elevation: 3,
-      alignItems: "center",
-      maxWidth: 650,
-      alignSelf: "center",
-    },
-    sectionTitle: {
-      fontSize: 22,
-      fontWeight: "bold",
-      color: "#2ecc40",
-      marginBottom: 6,
-      letterSpacing: 0.04,
-      textAlign: "center",
-    },
-    sectionIcon: {
-      marginBottom: 8,
-      marginTop: 2,
-    },
-    sectionEmoji: {
-      fontSize: 32,
-    },
-    sectionText: {
-      fontSize: 15,
-      color: isDark ? "#adb" : "#555",
-      textAlign: "center",
-      lineHeight: 24,
-      marginBottom: 10,
-    },
-    valuesGrid: {
-      flexDirection: "row",
-      flexWrap: "wrap",
-      justifyContent: "center",
-      marginTop: 15,
-      gap: 18,
-    },
-    valueCard: {
-      backgroundColor: isDark ? "#232529ee" : "#f7fafc",
-      borderRadius: 18,
-      paddingVertical: 16,
-      paddingHorizontal: 18,
-      minWidth: 138,
-      width: "44%",
-      maxWidth: 180,
-      marginHorizontal: 4,
-      marginBottom: 8,
-      alignItems: "center",
-      borderWidth: 1.2,
-      borderColor: isDark ? "#234d33" : "#e0e0e0",
-    },
-    valueIcon: {
-      width: 40,
-      height: 40,
-      borderRadius: 20,
-      backgroundColor: "#2ecc40",
-      alignItems: "center",
-      justifyContent: "center",
-      marginBottom: 5,
-    },
-    valueEmoji: {
-      fontSize: 21,
-    },
-    valueTitle: {
-      fontSize: 15,
-      fontWeight: "bold",
-      color: "#258d44",
-      marginBottom: 4,
-      letterSpacing: 0.01,
-      textAlign: "center",
-    },
-    valueDescription: {
-      fontSize: 13,
-      color: isDark ? "#b4e6c9" : "#6e8572",
-      lineHeight: 18,
-      textAlign: "center",
-    },
-  });
-}
+/* ---------------- STYLES ---------------- */
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: "#020617",
+  },
+  animatedBg: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(15,23,42,0.85)",
+  },
+
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingBottom: 10,
+    paddingHorizontal: 16,
+    backgroundColor: "rgba(2,6,23,0.8)",
+  },
+  backBtn: {
+    paddingRight: 12,
+    paddingVertical: 6,
+  },
+  headerBrand: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  headerLogo: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    marginRight: 8,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: "800",
+    color: "#2ecc40",
+  },
+
+  glassCard: {
+    marginHorizontal: 20,
+    marginBottom: 18,
+    padding: 26,
+    borderRadius: 24,
+    backgroundColor: "rgba(15,23,42,0.6)",
+    borderWidth: 1,
+    borderColor: "rgba(46,204,64,0.25)",
+    alignItems: "center",
+  },
+
+  logoCircle: {
+    width: 74,
+    height: 74,
+    borderRadius: 37,
+    backgroundColor: "#2ecc40",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 14,
+  },
+
+  heroTitle: {
+    fontSize: 28,
+    fontWeight: "900",
+    color: "#2ecc40",
+    textAlign: "center",
+  },
+  heroText: {
+    fontSize: 15,
+    color: "#b6e7c7",
+    textAlign: "center",
+    lineHeight: 22,
+    marginTop: 10,
+  },
+
+  sectionTitle: {
+    fontSize: 22,
+    fontWeight: "800",
+    color: "#2ecc40",
+    marginBottom: 6,
+    textAlign: "center",
+  },
+  sectionEmoji: {
+    fontSize: 30,
+    marginBottom: 6,
+  },
+  sectionText: {
+    fontSize: 14,
+    color: "#c8eedd",
+    textAlign: "center",
+    lineHeight: 22,
+  },
+
+  devGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    marginTop: 14,
+  },
+  devCard: {
+    flexBasis: "48%",
+    backgroundColor: "rgba(15,23,42,0.75)",
+    borderRadius: 18,
+    paddingVertical: 22,
+    paddingHorizontal: 14,
+    marginBottom: 16,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "rgba(46,204,64,0.25)",
+  },
+  devAvatar: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    borderWidth: 3,
+    borderColor: "#2ecc40",
+    marginBottom: 12,
+  },
+  devName: {
+    fontSize: 15,
+    fontWeight: "800",
+    color: "#2ecc40",
+    textAlign: "center",
+  },
+  devRole: {
+    fontSize: 12,
+    color: "#c8eedd",
+    textAlign: "center",
+    marginTop: 4,
+    lineHeight: 16,
+  },
+  linkedinBtn: {
+    marginTop: 10,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(10,102,194,0.35)",
+  },
+});

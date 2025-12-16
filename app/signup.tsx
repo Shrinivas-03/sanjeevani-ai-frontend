@@ -1,6 +1,6 @@
 import { API_BASE_URL } from "@/constants/api";
 import { useAuth } from "@/context/auth";
-import React, { useState, useRef, useEffect } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Alert,
   Animated,
@@ -322,19 +322,21 @@ function getStyles(isDark: boolean) {
     },
 
     logoWrapper: {
-      position: "absolute",
-      top: -45,
-      width: 95,
-      height: 95,
-      borderRadius: 48,
-      backgroundColor: isDark ? "#020617" : "#ecfdf3",
-      alignItems: "center",
-      justifyContent: "center",
-      borderWidth: 2,
-      borderColor: primary,
-      zIndex: 10,
-      overflow: "hidden",
-    },
+  position: "absolute",
+  top: -45,
+  alignSelf: "center",   // ✅ THIS CENTERS THE LOGO
+  width: 95,
+  height: 95,
+  borderRadius: 48,
+  backgroundColor: isDark ? "#020617" : "#ecfdf3",
+  alignItems: "center",
+  justifyContent: "center",
+  borderWidth: 2,
+  borderColor: primary,
+  zIndex: 10,
+  overflow: "hidden",
+},
+
     logo: { width: "85%", height: "85%" },
 
     card: {

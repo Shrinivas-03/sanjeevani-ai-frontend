@@ -51,6 +51,7 @@ async function sendMessageToAi(
     email,
     query,
     conversation_id: conversation_id ?? null,
+    exclude_prediction_context: true,
   };
 
   const res = await fetch(AI_REMEDY_ENDPOINT, {
@@ -209,11 +210,9 @@ export default function HistoryScreen() {
     setSending(true);
 
     try {
-      const data: any = await sendMessageToAi(
-        user.email,
-        textToSend,
-        selectedConvo,
-      );
+      // Send as fresh request (conversation_id = null) to avoid including
+      // previous prediction content when generating the assistant reply.
+      const data: any = await sendMessageToAi(user.email, textToSend, null);
 
       const assistantReply =
         data?.response ??
@@ -256,11 +255,18 @@ export default function HistoryScreen() {
   const primary = "#22c55e";
   const accent = theme === "dark" ? "#9EBCA0" : "#0b3d91";
   const bgLight = theme === "dark" ? "#020617" : "#eef9f2";
-  const cardBg = theme === "dark" ? "rgba(26,29,28,0.42)" : "rgba(255,255,255,0.92)";
+  const cardBg =
+    theme === "dark" ? "rgba(26,29,28,0.42)" : "rgba(255,255,255,0.92)";
   const topBarBg = theme === "dark" ? "rgba(44,204,64,0.08)" : "#e9fbee";
 
   // styles derived for component
-  const styles = makeStyles(theme, { primary, accent, bgLight, cardBg, topBarBg });
+  const styles = makeStyles(theme, {
+    primary,
+    accent,
+    bgLight,
+    cardBg,
+    topBarBg,
+  });
 
   return (
     <View style={styles.screen}>
@@ -278,7 +284,11 @@ export default function HistoryScreen() {
           </Pressable>
 
           {loading && (
-            <ActivityIndicator size="large" style={{ marginTop: 42 }} color={primary} />
+            <ActivityIndicator
+              size="large"
+              style={{ marginTop: 42 }}
+              color={primary}
+            />
           )}
 
           {!loading && (
@@ -290,21 +300,27 @@ export default function HistoryScreen() {
                 <TouchableOpacity
                   style={[
                     styles.convoItem,
-                    selectedConvo === item.conversation_id && styles.convoItemActive,
+                    selectedConvo === item.conversation_id &&
+                      styles.convoItemActive,
                   ]}
                   onPress={() => handleSelectConversation(item.conversation_id)}
                   activeOpacity={0.82}
                 >
                   <View style={styles.convoInner}>
                     <View style={styles.convoIcon}>
-                      <Ionicons name="chatbubble-ellipses-outline" size={22} color="#fff" />
+                      <Ionicons
+                        name="chatbubble-ellipses-outline"
+                        size={22}
+                        color="#fff"
+                      />
                     </View>
 
                     <View style={{ flex: 1 }}>
                       <Text
                         style={[
                           styles.convoPreview,
-                          selectedConvo === item.conversation_id && styles.convoPreviewActive,
+                          selectedConvo === item.conversation_id &&
+                            styles.convoPreviewActive,
                         ]}
                         numberOfLines={2}
                       >
@@ -312,7 +328,12 @@ export default function HistoryScreen() {
                       </Text>
                     </View>
 
-                    <Ionicons name="chevron-forward-outline" size={21} color="#bbb" style={{ marginLeft: 9 }} />
+                    <Ionicons
+                      name="chevron-forward-outline"
+                      size={21}
+                      color="#bbb"
+                      style={{ marginLeft: 9 }}
+                    />
                   </View>
                 </TouchableOpacity>
               )}
@@ -332,7 +353,11 @@ export default function HistoryScreen() {
           <View style={[styles.topBar, { backgroundColor: topBarBg }]}>
             <View style={{ flexDirection: "row", alignItems: "center" }}>
               <Pressable onPress={handleBack} style={styles.backBtn}>
-                <Ionicons name="arrow-back" size={13} color={theme === "dark" ? "#fff" : accent} />
+                <Ionicons
+                  name="arrow-back"
+                  size={13}
+                  color={theme === "dark" ? "#fff" : accent}
+                />
               </Pressable>
 
               <Text style={styles.conversationTitle}>Conversation</Text>
@@ -351,10 +376,18 @@ export default function HistoryScreen() {
             contentContainerStyle={{ paddingBottom: 100 }}
             showsVerticalScrollIndicator={false}
           >
-            {loading && <ActivityIndicator size="large" style={{ marginTop: 28 }} color={primary} />}
+            {loading && (
+              <ActivityIndicator
+                size="large"
+                style={{ marginTop: 28 }}
+                color={primary}
+              />
+            )}
 
             {!loading && messages.length === 0 && (
-              <Text style={styles.noMessagesText}>No messages in this thread.</Text>
+              <Text style={styles.noMessagesText}>
+                No messages in this thread.
+              </Text>
             )}
 
             {messages.map((m, idx) => (
@@ -362,18 +395,36 @@ export default function HistoryScreen() {
                 key={idx}
                 style={[
                   styles.messageCard,
-                  m.role === "user" ? styles.userCard : m.role === "assistant" ? styles.assistantCard : styles.systemCard,
+                  m.role === "user"
+                    ? styles.userCard
+                    : m.role === "assistant"
+                      ? styles.assistantCard
+                      : styles.systemCard,
                 ]}
               >
                 <View style={{ flexDirection: "row", alignItems: "center" }}>
                   <Ionicons
-                    name={m.role === "assistant" ? "logo-react" : m.role === "user" ? "person" : "help-circle"}
+                    name={
+                      m.role === "assistant"
+                        ? "logo-react"
+                        : m.role === "user"
+                          ? "person"
+                          : "help-circle"
+                    }
                     size={18}
-                    color={m.role === "assistant" ? primary : m.role === "user" ? "#0288D1" : "#9e9e9e"}
+                    color={
+                      m.role === "assistant"
+                        ? primary
+                        : m.role === "user"
+                          ? "#0288D1"
+                          : "#9e9e9e"
+                    }
                     style={{ marginRight: 6 }}
                   />
                   <Text style={styles.messageRole}>
-                    {m.role === "assistant" ? "Assistant" : m.role.charAt(0).toUpperCase() + m.role.slice(1)}
+                    {m.role === "assistant"
+                      ? "Assistant"
+                      : m.role.charAt(0).toUpperCase() + m.role.slice(1)}
                   </Text>
                 </View>
 
@@ -406,7 +457,11 @@ export default function HistoryScreen() {
                   inputText.trim().length === 0 ? styles.sendBtnDisabled : null,
                 ]}
               >
-                {sending ? <ActivityIndicator color="#fff" /> : <Ionicons name="send" size={20} color="#fff" />}
+                {sending ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Ionicons name="send" size={20} color="#fff" />
+                )}
               </TouchableOpacity>
             </View>
           </View>

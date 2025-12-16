@@ -2,7 +2,8 @@ import BrandHeader from "@/components/brand-header";
 import { sendMessage } from "@/constants/api";
 import { useAuth } from "@/context/auth";
 import { useAppTheme } from "@/context/theme";
-import React, { useEffect, useRef, useState } from "react";
+import { useFocusEffect } from "expo-router";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Animated,
   Image,
@@ -36,6 +37,17 @@ export default function WebChatPage() {
   const [conversationId, setConversationId] = useState<string | undefined>();
 
   const scrollViewRef = useRef<ScrollView>(null);
+
+  /* ================= RESET CHAT ON TAB FOCUS ================= */
+  useFocusEffect(
+    useCallback(() => {
+      setMessages([]);
+      setInput("");
+      setConversationId(undefined);
+      setLoading(false);
+      scrollViewRef.current?.scrollTo({ y: 0, animated: false });
+    }, [])
+  );
 
   /* ================= Message appear animation ================= */
   const animMap = useRef<Record<string, Animated.Value>>({}).current;
@@ -74,7 +86,7 @@ export default function WebChatPage() {
             duration: 350,
             useNativeDriver: true,
           }),
-        ]),
+        ])
       );
 
     const a1 = pulse(dot1, 0);
@@ -86,9 +98,9 @@ export default function WebChatPage() {
     a3.start();
 
     return () => {
-      dot1.stopAnimation();
-      dot2.stopAnimation();
-      dot3.stopAnimation();
+      a1.stop();
+      a2.stop();
+      a3.stop();
     };
   }, [loading]);
 
@@ -149,7 +161,7 @@ export default function WebChatPage() {
                   key={msg.id}
                   style={[
                     styles.msgWrapper,
-                    isUser ? styles.rightMsg : styles.leftMsg, // ✅ SWAPPED
+                    isUser ? styles.rightMsg : styles.leftMsg,
                     {
                       opacity: anim,
                       transform: [
@@ -179,7 +191,6 @@ export default function WebChatPage() {
               );
             })}
 
-            {/* THINKING */}
             {loading && (
               <View style={[styles.msgWrapper, styles.leftMsg]}>
                 <Text style={styles.icon}>🤖</Text>
@@ -194,7 +205,6 @@ export default function WebChatPage() {
             )}
           </ScrollView>
 
-          {/* INPUT */}
           <View style={styles.inputWrapper}>
             <View style={styles.inputBox}>
               <TextInput
@@ -251,26 +261,18 @@ function getStyles(theme: string) {
 
     chatBubble: { paddingHorizontal: 14, paddingVertical: 14 },
 
-    /* USER → RIGHT */
     userBubble: {
       backgroundColor: isDark ? "#1d8faf4c" : "#20603df4",
+      borderRadius: 18,
       borderTopRightRadius: 6,
-      borderTopLeftRadius: 18,
-      borderBottomLeftRadius: 18,
-      borderBottomRightRadius: 18,
-            borderWidth: 1,
-
+      borderWidth: 1,
       borderColor: isDark ? "#6c5ad4f5" : "#dce8e0ff",
-
     },
 
-    /* ASSISTANT → LEFT */
     assistantBubble: {
       backgroundColor: isDark ? "#1d8faf4c" : "#20603df4",
-      borderTopLeftRadius: 1,
-      borderTopRightRadius: 18,
-      borderBottomLeftRadius: 18,
-      borderBottomRightRadius: 18,
+      borderRadius: 18,
+      borderTopLeftRadius: 6,
       borderWidth: 1,
       borderColor: isDark ? "#6c5ad4f5" : "#bbf7d0",
     },
@@ -287,18 +289,22 @@ function getStyles(theme: string) {
       marginHorizontal: 3,
     },
 
-    inputWrapper: { paddingVertical: 0 },
+    inputWrapper: { paddingVertical: 8 },
     inputBox: {
       flexDirection: "row",
       alignItems: "center",
       backgroundColor: isDark ? "rgba(42,183,222,0.35)" : "rgba(3,42,6,0.9)",
       borderRadius: 28,
       paddingLeft: 18,
-      paddingVertical: 4,
       borderWidth: 1.5,
       borderColor: isDark ? "#45c7c7ff" : "#bbf7d0",
     },
-    input: { flex: 1, fontSize: 16, paddingVertical: 6, color: isDark ? "#e1f9e5" : "#e9fff1" },
+    input: {
+      flex: 1,
+      fontSize: 16,
+      paddingVertical: 8,
+      color: isDark ? "#e1f9e5" : "#e9fff1",
+    },
     sendBtn: {
       width: 44,
       height: 44,

@@ -363,6 +363,7 @@ export default function PredictionScreen() {
 
   const [feedbackModalVisible, setFeedbackModalVisible] = useState(false);
   const [feedbackChoice, setFeedbackChoice] = useState<boolean | null>(null);
+  const scrollRef = useRef<ScrollView | null>(null);
 
   useEffect(() => {
     if (!loading && !isAuthenticated) router.replace("/signin");
@@ -435,8 +436,30 @@ export default function PredictionScreen() {
         }),
       });
 
+      // Close modal, thank the user, and reset prediction state so user can
+      // start a new prediction immediately.
       setFeedbackModalVisible(false);
       Alert.alert("Thank you!", "Your feedback helps improve the model.");
+
+      // Clear the prediction result and reset form fields
+      setPredictionResult(null);
+      setFeedbackChoice(null);
+      setShowGenderDropdown(false);
+      setName("");
+      setAge("");
+      setGender("");
+      setHeight("");
+      setWeight("");
+      setPulseRate("");
+      setBpSystolic("");
+      setBpDiastolic("");
+      setFbs("");
+      setPpbs("");
+      setMedicalHistory("");
+      setSymptoms("");
+
+      // Scroll back to the top of the form so the user can start a new one.
+      scrollRef.current?.scrollTo?.({ y: 0, animated: true });
     } catch {
       Alert.alert("Error", "Could not submit feedback.");
     }
@@ -461,6 +484,7 @@ export default function PredictionScreen() {
           behavior={Platform.OS === "ios" ? "padding" : "height"}
         >
           <ScrollView
+            ref={scrollRef}
             keyboardShouldPersistTaps="handled"
             contentContainerStyle={{
               paddingHorizontal: 16,
